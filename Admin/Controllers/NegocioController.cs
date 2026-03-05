@@ -8,6 +8,7 @@ using Utilities.Shared;
 
 namespace APIRestSistemaVentas.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class NegocioController : ControllerBase
