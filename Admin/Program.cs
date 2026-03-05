@@ -113,6 +113,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("NuevaPolitica");
 
 app.UseRouting();
+app.UseAuthentication();
 
 app.UseAuthorization();
 
