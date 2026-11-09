@@ -1,6 +1,5 @@
 ﻿using Domain.Model;
 using Domain.Model.Dto;
-using Microsoft.SqlServer.Types;
 using NetTopologySuite.Geometries;
 
 namespace Domain.Mapper
@@ -19,7 +18,7 @@ namespace Domain.Mapper
                 Estado = dto.Estado,
                 Ubicacion_Sucursal =
                     dto.Latitud.HasValue && dto.Longitud.HasValue
-                    ? new Point(dto.Latitud.Value, dto.Longitud.Value, 4326)
+                    ? new Point(dto.Longitud.Value, dto.Latitud.Value) { SRID = 4326 }
                     : null
             };
         }
