@@ -4,8 +4,10 @@ using Domain.Model.Dto;
 using Infrastructure.Repository.InterfacesRepository;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.SqlServer.Types;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
 using System.Data;
+using System.Data.SqlTypes;
 using Utilities.Shared;
 
 namespace Infrastructure.Repository
@@ -79,10 +81,9 @@ namespace Infrastructure.Repository
 
         public async Task<int> RegistrarSucursalAsync(SucursalUbicacion sucursal)
         {
-            using var connection = _context.Database.GetDbConnection();
-            await connection.OpenAsync();
+            await _context.Database.OpenConnectionAsync();
 
-            using var command = connection.CreateCommand();
+            using var command = _context.Database.GetDbConnection().CreateCommand();
             command.CommandText = "PA_REGISTRAR_SUCURSAL";
             command.CommandType = CommandType.StoredProcedure;
 
@@ -90,24 +91,7 @@ namespace Infrastructure.Repository
             command.Parameters.Add(new SqlParameter("@Id_Negocio", sucursal.Id_Negocio ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Nombre", sucursal.Nombre_Sucursal ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Direccion", sucursal.Direccion_Sucursal ?? (object)DBNull.Value));
-
-            var ubicacionParam = new SqlParameter("@Ubicacion", SqlDbType.Udt)
-            {
-                UdtTypeName = "geography"
-            };
-
-            if (sucursal.Latitud.HasValue && sucursal.Longitud.HasValue)
-            {
-                var geography = SqlGeography.Point(sucursal.Latitud.Value, sucursal.Longitud.Value, 4326);
-                ubicacionParam.Value = geography;
-            }
-            else
-            {
-                ubicacionParam.Value = DBNull.Value;
-            }
-
-            command.Parameters.Add(ubicacionParam);
-
+            command.Parameters.Add(CrearParametroUbicacion(sucursal));
             command.Parameters.Add(new SqlParameter("@Ciudad", sucursal.Ciudad_Sucursal ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Estado", sucursal.Estado ?? (object)DBNull.Value));
 
@@ -116,38 +100,38 @@ namespace Infrastructure.Repository
 
         public async Task<int> EditarSucursalAsync(SucursalUbicacion sucursal)
         {
-            using var connection = _context.Database.GetDbConnection();
-            await connection.OpenAsync();
+            await _context.Database.OpenConnectionAsync();
 
-            using var command = connection.CreateCommand();
+            using var command = _context.Database.GetDbConnection().CreateCommand();
             command.CommandText = "PA_EDITAR_SUCURSAL";
             command.CommandType = CommandType.StoredProcedure;
 
             command.Parameters.Add(new SqlParameter("@Id_Sucursal", sucursal.Id_Sucursal));
             command.Parameters.Add(new SqlParameter("@Nombre", sucursal.Nombre_Sucursal ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Direccion", sucursal.Direccion_Sucursal ?? (object)DBNull.Value));
-
-            var ubicacionParam = new SqlParameter("@Ubicacion", SqlDbType.Udt)
-            {
-                UdtTypeName = "geography"
-            };
-
-            if (sucursal.Latitud.HasValue && sucursal.Longitud.HasValue)
-            {
-                var geography = SqlGeography.Point(sucursal.Latitud.Value, sucursal.Longitud.Value, 4326);
-                ubicacionParam.Value = geography;
-            }
-            else
-            {
-                ubicacionParam.Value = DBNull.Value;
-            }
-
-            command.Parameters.Add(ubicacionParam);
-
+            command.Parameters.Add(CrearParametroUbicacion(sucursal));
             command.Parameters.Add(new SqlParameter("@Ciudad", sucursal.Ciudad_Sucursal ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Estado", sucursal.Estado ?? (object)DBNull.Value));
 
             return await command.ExecuteNonQueryAsync();
+        }
+
+        private static SqlParameter CrearParametroUbicacion(SucursalUbicacion sucursal)
+        {
+            var parametro = new SqlParameter("@Ubicacion", SqlDbType.Udt) { UdtTypeName = "geography" };
+
+            if (sucursal.Latitud.HasValue && sucursal.Longitud.HasValue)
+            {
+                var punto = new Point(sucursal.Longitud.Value, sucursal.Latitud.Value) { SRID = 4326 };
+                var bytes = new SqlServerBytesWriter { IsGeography = true }.Write(punto);
+                parametro.Value = new SqlBytes(bytes);
+            }
+            else
+            {
+                parametro.Value = DBNull.Value;
+            }
+
+            return parametro;
         }
 
         public async Task<int> EliminarSucursalAsync(int idSucursal)
