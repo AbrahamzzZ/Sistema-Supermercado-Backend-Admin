@@ -9,7 +9,6 @@ namespace Utilities.IA
         public OllamaClient(HttpClient http)
         {
             _http = http;
-            _http.BaseAddress = new Uri("http://localhost:11434");
         }
 
         public async Task<string> GenerateAsync(string prompt, string model = "qwen3:8b")
