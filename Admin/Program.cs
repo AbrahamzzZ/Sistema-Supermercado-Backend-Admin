@@ -3,29 +3,29 @@ using Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Utilities.IA;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de clave JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var claveSecreta = jwtSettings.GetValue<string>("Key");
 
 builder.Services.AddDbContext<AdminSistemaSupermercadoContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("CadenaSQL"),
-        x => x.UseNetTopologySuite()
+        x =>
+        {
+            x.UseNetTopologySuite();
+            x.EnableRetryOnFailure(maxRetryCount: 10, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null);
+        }
     )
 );
 
-// Inyección de dependencias separada en métodos de extensión
 builder.Services.AddRepositories();
 builder.Services.AddServices();
 builder.Services.AddValidators();
 builder.Services.AddHttpClient<OllamaClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:11434");
+    client.BaseAddress = new Uri(builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
     client.Timeout = Timeout.InfiniteTimeSpan;
 });
 
@@ -37,7 +37,10 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    // Descarga la clave pÃºblica desde {Authority}/.well-known/openid-configuration -> jwks.json
+    options.Authority = jwtSettings["Authority"];
+    options.RequireHttpsMetadata = jwtSettings.GetValue("RequireHttpsMetadata", true);
+    options.RefreshInterval = TimeSpan.FromSeconds(30);
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -47,7 +50,8 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(claveSecreta))
+        ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 },
+        ClockSkew = TimeSpan.FromSeconds(30)
     };
 });
 
@@ -63,13 +67,13 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Agregar Swagger para documentación API  https://aka.ms/aspnetcore/swashbuckle
+// Agregar Swagger para documentaciÃ³n API  https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new() { Title = "API-Admin", Version = "v1" });
 
-    // Configuración de seguridad JWT
+    // ConfiguraciÃ³n de seguridad JWT
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -104,7 +108,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
