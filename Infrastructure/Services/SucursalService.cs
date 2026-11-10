@@ -3,6 +3,7 @@ using Infrastructure.Repository.InterfacesRepository;
 using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 using Domain.Model.Dto;
 
@@ -12,23 +13,14 @@ namespace Infrastructure.Services
     {
         private readonly SucursalRepository _sucursalRepository;
         private readonly IValidator<SucursalUbicacion> _validator;
+        private readonly ILogger<SucursalService> _logger;
 
-        public SucursalService(SucursalRepository sucursalRepository, IValidator<SucursalUbicacion> validator)
+        public SucursalService(SucursalRepository sucursalRepository, IValidator<SucursalUbicacion> validator, ILogger<SucursalService> logger)
         {
+            _logger = logger;
             _sucursalRepository = sucursalRepository;
             _validator = validator;
         }
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-
-        /*readonly ISucursalRepository _sucursalRepository;
-        private readonly IValidator<Sucursal> _validator;
-
-        public SucursalService(ISucursalRepository sucursalRepository, IValidator<Sucursal> validator)
-        {
-            _sucursalRepository = sucursalRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<List<SucursalUbicacion>>> ListarSucursalesAsync()
         {
@@ -69,48 +61,48 @@ namespace Infrastructure.Services
             var validationResult = await _validator.ValidateAsync(sucursal);
 
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "RegistrarSucursalAsync", sucursal?.Id_Sucursal);
 
             var sucursales = await _sucursalRepository.ListarSucursalesAsync();
             if (sucursales.Any(c => c.Codigo == sucursal.Codigo))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El código ya existe" };
+                return ReglaIncumplida<object>("El código ya existe", "RegistrarSucursalAsync", sucursal?.Id_Sucursal);
 
             if (sucursales.Any(c => c.Nombre_Sucursal?.ToLower() == sucursal.Nombre_Sucursal?.ToLower()))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe" };
+                return ReglaIncumplida<object>("El nombre ya existe", "RegistrarSucursalAsync", sucursal?.Id_Sucursal);
 
             var result = await _sucursalRepository.RegistrarSucursalAsync(sucursal);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_REGISTER };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_REGISTER_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_REGISTER_FAILLED, "RegistrarSucursalAsync", sucursal?.Id_Sucursal);
         }
 
         public async Task<ApiResponse<object>> EditarSucursalAsync(SucursalUbicacion sucursal)
         {
             if (sucursal == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarSucursalAsync", sucursal?.Id_Sucursal);
 
             var validationResult = await _validator.ValidateAsync(sucursal);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarSucursalAsync", sucursal?.Id_Sucursal);
 
             var sucursalExistente = await _sucursalRepository.ObtenerSucursalAsync(sucursal.Id_Sucursal);
             if (sucursalExistente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EditarSucursalAsync", sucursal?.Id_Sucursal);
 
             var categorias = await _sucursalRepository.ListarSucursalesAsync();
             if (categorias.Any(c =>
                 c.Nombre_Sucursal?.ToLower() == sucursal.Nombre_Sucursal?.ToLower()
                 && c.Id_Sucursal != sucursal.Id_Sucursal))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe." };
+                return ReglaIncumplida<object>("El nombre ya existe.", "EditarSucursalAsync", sucursal?.Id_Sucursal);
             }
 
             var result = await _sucursalRepository.EditarSucursalAsync(sucursal);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarSucursalAsync", sucursal?.Id_Sucursal);
         }
 
         public async Task<ApiResponse<int>> EliminarSucursalAsync(int id)
@@ -118,7 +110,7 @@ namespace Infrastructure.Services
             var existe = await _sucursalRepository.ObtenerSucursalAsync(id);
             if (existe == null)
             {
-                return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<int>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EliminarSucursalAsync", id);
             }
 
             var result = await _sucursalRepository.EliminarSucursalAsync(id);
@@ -126,7 +118,14 @@ namespace Infrastructure.Services
             if (result > 0)
                 return new ApiResponse<int> { IsSuccess = true, Message = Mensajes.MESSAGE_DELETE };
 
-            return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_DELETE_FAILLED };
+            return ReglaIncumplida<int>(Mensajes.MESSAGE_DELETE_FAILLED, "EliminarSucursalAsync", id);
         }
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
+        }
+
     }
 }

@@ -5,6 +5,7 @@ using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
 using Utilities.IA;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -14,24 +15,15 @@ namespace Infrastructure.Services
         private readonly NegocioRepository _negocioRepository;
         private readonly IValidator<Negocio> _validator;
         private readonly OllamaClient _ollama;
+        private readonly ILogger<NegocioService> _logger;
 
-        public NegocioService(NegocioRepository negocioRepository, IValidator<Negocio> validator, OllamaClient ollama)
+        public NegocioService(NegocioRepository negocioRepository, IValidator<Negocio> validator, OllamaClient ollama, ILogger<NegocioService> logger)
         {
+            _logger = logger;
             _negocioRepository = negocioRepository;
             _validator = validator;
             _ollama = ollama;
         }
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-
-        /*readonly INegocioRepository _negocioRepository;
-        private readonly IValidator<Negocio> _validator;
-
-        public NegocioService(INegocioRepository negocioRepository, IValidator<Negocio> validator)
-        {
-            _negocioRepository = negocioRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<Negocio>> ObtenerNegocioAsync(int idNegocio)
         {
@@ -45,21 +37,21 @@ namespace Infrastructure.Services
         public async Task<ApiResponse<object>> EditarNegocioAsync(Negocio negocio)
         {
             if (negocio == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarNegocioAsync", negocio?.Id_Negocio);
 
             var validationResult = await _validator.ValidateAsync(negocio);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarNegocioAsync", negocio?.Id_Negocio);
 
             var negocioExistente = await _negocioRepository.ObtenerNegocioAsync(negocio.Id_Negocio);
             if (negocioExistente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EditarNegocioAsync", negocio?.Id_Negocio);
 
             var result = await _negocioRepository.EditarNegocioAsync(negocio);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarNegocioAsync", negocio?.Id_Negocio);
         }
 
         public async Task<ApiResponse<List<ProductoMasComprado>>> ObtenerProductoMasComprado()
@@ -102,7 +94,17 @@ namespace Infrastructure.Services
             No escribas más de 5 líneas.
             Sé directo e informativo.
             ";
-            string analisisIA = await _ollama.GenerateAsync(prompt);
+            string analisisIA;
+            try
+            {
+                analisisIA = await _ollama.GenerateAsync(prompt);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+            {
+                // Fallo técnico (Ollama caído, timeout o respuesta inválida): nivel Error
+                _logger.LogError(ex, "Error al generar el análisis con IA (Ollama) para {CantidadProductos} productos", lista.Count);
+                return new ApiResponse<object> { IsSuccess = false, Message = "El servicio de IA no está disponible en este momento." };
+            }
 
             return new ApiResponse<object>
             {
@@ -155,5 +157,12 @@ namespace Infrastructure.Services
 
             return new ApiResponse<List<EmpleadoProductivo>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
         }
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
+        }
+
     }
 }

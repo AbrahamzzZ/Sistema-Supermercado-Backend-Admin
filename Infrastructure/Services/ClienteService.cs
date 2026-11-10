@@ -4,6 +4,7 @@ using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -12,23 +13,14 @@ namespace Infrastructure.Services
     {
         private readonly ClienteRepository _clienteRepository;
         private readonly IValidator<Cliente> _validator;
+        private readonly ILogger<ClienteService> _logger;
 
-        public ClienteService(ClienteRepository clienteRepository, IValidator<Cliente> validator)
+        public ClienteService(ClienteRepository clienteRepository, IValidator<Cliente> validator, ILogger<ClienteService> logger)
         {
+            _logger = logger;
             _clienteRepository = clienteRepository;
             _validator = validator;
         }
-
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-
-        /*readonly IClienteRepository _clienteRepository;
-        private readonly IValidator<Cliente> _validator;
-        public ClienteService(IClienteRepository clienteRepository, IValidator<Cliente> validator)
-        {
-            _clienteRepository = clienteRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<List<Cliente>>> ListarClientesAsync()
         {
@@ -69,53 +61,53 @@ namespace Infrastructure.Services
             var validationResult = await _validator.ValidateAsync(cliente);
 
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "RegistrarClienteAsync", cliente?.Id_Cliente);
 
             var clientes = await _clienteRepository.ListarClientesAsync();
             if (clientes.Any(c => c.Codigo == cliente.Codigo))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El código ya existe" };
+                return ReglaIncumplida<object>("El código ya existe", "RegistrarClienteAsync", cliente?.Id_Cliente);
 
             if (clientes.Any(c => c.Cedula == cliente.Cedula))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El cédula ya existe" };
+                return ReglaIncumplida<object>("El cédula ya existe", "RegistrarClienteAsync", cliente?.Id_Cliente);
 
             if (clientes.Any(c => c.Telefono == cliente.Telefono))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El télefono ya existe" };
+                return ReglaIncumplida<object>("El télefono ya existe", "RegistrarClienteAsync", cliente?.Id_Cliente);
 
             var result = await _clienteRepository.RegistrarClienteAsync(cliente);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_REGISTER };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_REGISTER_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_REGISTER_FAILLED, "RegistrarClienteAsync", cliente?.Id_Cliente);
         }
 
 
         public async Task<ApiResponse<object>> EditarClienteAsync(Cliente cliente)
         {
             if (cliente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarClienteAsync", cliente?.Id_Cliente);
 
             var validationResult = await _validator.ValidateAsync(cliente);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarClienteAsync", cliente?.Id_Cliente);
 
             var clienteExistente = await _clienteRepository.ObtenerClienteAsync(cliente.Id_Cliente);
             if (clienteExistente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EditarClienteAsync", cliente?.Id_Cliente);
 
             var clientes = await _clienteRepository.ListarClientesAsync();
             if (clientes.Any(c =>c.Cedula == cliente.Cedula && c.Id_Cliente != cliente.Id_Cliente))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El cédula ya existe." };
+                return ReglaIncumplida<object>("El cédula ya existe.", "EditarClienteAsync", cliente?.Id_Cliente);
             }else if (clientes.Any(c => c.Telefono == cliente.Telefono && c.Id_Cliente != cliente.Id_Cliente))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El teléfono ya existe." };
+                return ReglaIncumplida<object>("El teléfono ya existe.", "EditarClienteAsync", cliente?.Id_Cliente);
             }
 
             var result = await _clienteRepository.EditarClienteAsync(cliente);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarClienteAsync", cliente?.Id_Cliente);
         }
 
         public async Task<ApiResponse<int>> EliminarClienteAsync(int id)
@@ -125,7 +117,7 @@ namespace Infrastructure.Services
                 var existe = await _clienteRepository.ObtenerClienteAsync(id);
                 if (existe == null)
                 {
-                    return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                    return ReglaIncumplida<int>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EliminarClienteAsync", id);
                 }
 
                 var result = await _clienteRepository.EliminarClienteAsync(id);
@@ -133,12 +125,19 @@ namespace Infrastructure.Services
                 if (result > 0)
                     return new ApiResponse<int> { IsSuccess = true, Message = Mensajes.MESSAGE_DELETE };
 
-                return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_DELETE_FAILLED };
+                return ReglaIncumplida<int>(Mensajes.MESSAGE_DELETE_FAILLED, "EliminarClienteAsync", id);
             }
-            catch (SqlException ex) when (ex.Number == 547)
+            catch (SqlException ex) when (ex.Number is 547 or 50547)
             {
-                return new ApiResponse<int> { IsSuccess = false, Message = "No se puede eliminar al cliente porque tiene ventas asociadas." };
+                return ReglaIncumplida<int>("No se puede eliminar al cliente porque tiene ventas asociadas.", "EliminarClienteAsync", id);
             }
         }
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
+        }
+
     }
 }
