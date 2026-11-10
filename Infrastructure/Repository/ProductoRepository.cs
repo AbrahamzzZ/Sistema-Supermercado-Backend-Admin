@@ -2,6 +2,7 @@
 using Domain.Model;
 using Domain.Model.Dto;
 using Infrastructure.Repository.InterfacesRepository;
+using Infrastructure.Security;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
@@ -12,10 +13,12 @@ namespace Infrastructure.Repository
     public class ProductoRepository : IProductoRepository
     {
         private readonly AdminSistemaSupermercadoContext _context;
+        private readonly ICurrentUserService _currentUser;
 
-        public ProductoRepository(AdminSistemaSupermercadoContext context)
+        public ProductoRepository(AdminSistemaSupermercadoContext context, ICurrentUserService currentUser)
         {
             _context = context;
+            _currentUser = currentUser;
         }
 
         public async Task<List<ProductoCategoria>> ListarProductosAsync()
@@ -52,7 +55,8 @@ namespace Infrastructure.Repository
                         Id_Categoria = reader.GetInt32(4),
                         Nombre_Categoria = reader.GetString(5),
                         Pais_Origen = reader.GetString(6),
-                        Estado = reader.GetBoolean(10)
+                        // Antes se leía la posición 10, que no existe en el SP (ESTADO es la columna 7)
+                        Estado = reader.GetBoolean(reader.GetOrdinal("ESTADO"))
                     });
                 }
 
@@ -70,7 +74,7 @@ namespace Infrastructure.Repository
             var idParam = new SqlParameter("@Id_Producto", idProducto);
             return await Task.Run(() =>
                 _context.Producto
-                .FromSqlRaw("EXEC PA_OBTENER_PRODUCTO @Id_Producto", idParam)
+                .FromSqlRaw("EXEC PA_OBTENER_PRODUCTO @Id_Producto = @Id_Producto", idParam)
                 .AsNoTracking()
                 .AsEnumerable()
                 .FirstOrDefault()
@@ -81,13 +85,14 @@ namespace Infrastructure.Repository
         {
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_REGISTRAR_PRODUCTO @Codigo, @Descripcion, @Nombre_Producto, @Id_Categoria, @Pais_Origen, @Estado",
+                "EXEC PA_REGISTRAR_PRODUCTO @Codigo = @Codigo, @Descripcion = @Descripcion, @Nombre_Producto = @Nombre_Producto, @Id_Categoria = @Id_Categoria, @Pais_Origen = @Pais_Origen, @Estado = @Estado, @Id_Usuario_Creacion = @Id_Usuario_Creacion",
                 new SqlParameter("@Codigo", producto.Codigo ?? (object)DBNull.Value),
                 new SqlParameter("@Descripcion", producto.Descripcion ?? (object)DBNull.Value),
                 new SqlParameter("@Nombre_Producto", producto.Nombre_Producto ?? (object)DBNull.Value),
                 new SqlParameter("@Id_Categoria", producto.Id_Categoria ?? (object)DBNull.Value),
                 new SqlParameter("@Pais_Origen", producto.Pais_Origen ?? (object)DBNull.Value),
-                new SqlParameter("@Estado", producto.Estado ?? (object)DBNull.Value)
+                new SqlParameter("@Estado", producto.Estado ?? (object)DBNull.Value),
+                new SqlParameter("@Id_Usuario_Creacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
@@ -95,21 +100,23 @@ namespace Infrastructure.Repository
         {
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_EDITAR_PRODUCTO @Id_Producto, @Descripcion, @Nombre_Producto, @Id_Categoria, @Pais_Origen, @Estado",
+                "EXEC PA_EDITAR_PRODUCTO @Id_Producto = @Id_Producto, @Descripcion = @Descripcion, @Nombre_Producto = @Nombre_Producto, @Id_Categoria = @Id_Categoria, @Pais_Origen = @Pais_Origen, @Estado = @Estado, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
                 new SqlParameter("@Id_Producto", producto.Id_Producto),
                 new SqlParameter("@Descripcion", producto.Descripcion ?? (object)DBNull.Value),
                 new SqlParameter("@Nombre_Producto", producto.Nombre_Producto ?? (object)DBNull.Value),
                 new SqlParameter("@Id_Categoria", producto.Id_Categoria ?? (object)DBNull.Value),
                 new SqlParameter("@Pais_Origen", producto.Pais_Origen ?? (object)DBNull.Value),
-                new SqlParameter("@Estado", producto.Estado ?? (object)DBNull.Value)
+                new SqlParameter("@Estado", producto.Estado ?? (object)DBNull.Value),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
         public async Task<int> EliminarProductoAsync(int idProducto)
         {
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_ELIMINAR_PRODUCTO @Id_Producto",
-                new SqlParameter("@Id_Producto", idProducto)
+                "EXEC PA_ELIMINAR_PRODUCTO @Id_Producto = @Id_Producto, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
+                new SqlParameter("@Id_Producto", idProducto),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
     }

@@ -2,6 +2,7 @@
 using Domain.Model;
 using Domain.Model.Dto;
 using Infrastructure.Repository.InterfacesRepository;
+using Infrastructure.Security;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -15,10 +16,12 @@ namespace Infrastructure.Repository
     public class SucursalRepository : ISucursalRepository
     {
         private readonly AdminSistemaSupermercadoContext _context;
+        private readonly ICurrentUserService _currentUser;
 
-        public SucursalRepository(AdminSistemaSupermercadoContext context)
+        public SucursalRepository(AdminSistemaSupermercadoContext context, ICurrentUserService currentUser)
         {
             _context = context;
+            _currentUser = currentUser;
         }
 
         public async Task<List<SucursalUbicacion>> ListarSucursalesAsync()
@@ -72,7 +75,7 @@ namespace Infrastructure.Repository
             var idParam = new SqlParameter("@Id_Sucursal", idSucursal);
             return await Task.Run(() =>
                 _context.SucursalUbicacion
-                .FromSqlRaw("EXEC PA_OBTENER_SUCURSAL @Id_Sucursal", idParam)
+                .FromSqlRaw("EXEC PA_OBTENER_SUCURSAL @Id_Sucursal = @Id_Sucursal", idParam)
                 .AsNoTracking()
                 .AsEnumerable()
                 .FirstOrDefault()
@@ -94,6 +97,7 @@ namespace Infrastructure.Repository
             command.Parameters.Add(CrearParametroUbicacion(sucursal));
             command.Parameters.Add(new SqlParameter("@Ciudad", sucursal.Ciudad_Sucursal ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Estado", sucursal.Estado ?? (object)DBNull.Value));
+            command.Parameters.Add(new SqlParameter("@Id_Usuario_Creacion", _currentUser.IdUsuario.ComoParametro()));
 
             return await command.ExecuteNonQueryAsync();
         }
@@ -112,6 +116,7 @@ namespace Infrastructure.Repository
             command.Parameters.Add(CrearParametroUbicacion(sucursal));
             command.Parameters.Add(new SqlParameter("@Ciudad", sucursal.Ciudad_Sucursal ?? (object)DBNull.Value));
             command.Parameters.Add(new SqlParameter("@Estado", sucursal.Estado ?? (object)DBNull.Value));
+            command.Parameters.Add(new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro()));
 
             return await command.ExecuteNonQueryAsync();
         }
@@ -137,8 +142,9 @@ namespace Infrastructure.Repository
         public async Task<int> EliminarSucursalAsync(int idSucursal)
         {
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_ELIMINAR_SUCURSAL @Id_Sucursal",
-                new SqlParameter("@Id_Sucursal", idSucursal)
+                "EXEC PA_ELIMINAR_SUCURSAL @Id_Sucursal = @Id_Sucursal, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
+                new SqlParameter("@Id_Sucursal", idSucursal),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
     }

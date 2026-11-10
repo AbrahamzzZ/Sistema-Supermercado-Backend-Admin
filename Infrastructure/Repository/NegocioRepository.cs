@@ -3,24 +3,28 @@ using Domain.Model;
 using Domain.Model.Dto.Negocio;
 using Infrastructure.Repository.InterfacesRepository;
 using Microsoft.Data.SqlClient;
+using Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace Infrastructure.Repository
 {
     public class NegocioRepository : INegocioRepository
     {
         private readonly AdminSistemaSupermercadoContext _context;
+        private readonly ICurrentUserService _currentUser;
 
-        public NegocioRepository(AdminSistemaSupermercadoContext context)
+        public NegocioRepository(AdminSistemaSupermercadoContext context, ICurrentUserService currentUser)
         {
             _context = context;
+            _currentUser = currentUser;
         }
 
         public async Task<Negocio?> ObtenerNegocioAsync(int idNegocio)
         {
             var idParam = new SqlParameter("@Id_Negocio", idNegocio);
             return await Task.Run(() => _context.Negocio
-                .FromSqlRaw("EXEC PA_OBTENER_NEGOCIO @Id_Negocio", idParam)
+                .FromSqlRaw("EXEC PA_OBTENER_NEGOCIO @Id_Negocio = @Id_Negocio", idParam)
                 .AsNoTracking()
                 .AsEnumerable()
                 .FirstOrDefault()
@@ -40,14 +44,15 @@ namespace Infrastructure.Repository
             }
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_EDITAR_NEGOCIO @Id_Negocio, @Nombre, @Telefono, @Ruc, @Direccion, @Correo_Electronico, @Logo",
+                "EXEC PA_EDITAR_NEGOCIO @Id_Negocio = @Id_Negocio, @Nombre = @Nombre, @Telefono = @Telefono, @Ruc = @Ruc, @Direccion = @Direccion, @Correo_Electronico = @Correo_Electronico, @Logo = @Logo, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
                 new SqlParameter("@Id_Negocio", negocio.Id_Negocio),
                 new SqlParameter("@Nombre", negocio.Nombre ?? (object)DBNull.Value),
                 new SqlParameter("@Telefono", negocio.Telefono ?? (object)DBNull.Value),
                 new SqlParameter("@Ruc", negocio.Ruc ?? (object)DBNull.Value),
                 new SqlParameter("@Direccion", negocio.Direccion ?? (object)DBNull.Value),
                 new SqlParameter("@Correo_Electronico", negocio.Correo_Electronico ?? (object)DBNull.Value),
-                new SqlParameter("@Logo", negocio.Logo ?? (object)DBNull.Value)
+                new SqlParameter("@Logo", SqlDbType.VarBinary, -1) { Value = negocio.Logo ?? (object)DBNull.Value },
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
