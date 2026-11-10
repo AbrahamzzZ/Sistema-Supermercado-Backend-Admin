@@ -1,11 +1,26 @@
+using Admin.Observabilidad;
 using Domain.Context;
 using Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using Serilog.Events;
+using System.Security.Claims;
 using Utilities.IA;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Logs estructurados: consola + Seq (en Docker Seq__ServerUrl=http://seq:80)
+builder.Host.UseSerilog((ctx, sp, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Servicio", "Admin")
+    .WriteTo.Console()
+    .WriteTo.Seq(ctx.Configuration["Seq:ServerUrl"] ?? "http://localhost:5341"));
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 
@@ -108,6 +123,24 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseExceptionHandler();
+
+// Un log por petición: Information = OK, Warning = 4xx (reglas de negocio / validación), Error = 5xx o excepción
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (ctx, _, ex) =>
+        ex != null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error
+        : ctx.Response.StatusCode >= 400 ? LogEventLevel.Warning
+        : LogEventLevel.Information;
+
+    options.EnrichDiagnosticContext = (diagnostico, ctx) =>
+    {
+        diagnostico.Set("IdUsuario", ctx.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        diagnostico.Set("CorrelationId", ctx.Items[CorrelationIdMiddleware.ItemKey]);
+    };
+});
+
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 {
     app.UseSwagger();
