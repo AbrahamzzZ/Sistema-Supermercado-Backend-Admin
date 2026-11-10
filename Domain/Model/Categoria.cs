@@ -1,8 +1,10 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using Domain.Model.Common;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Domain.Model;
 
-public class Categoria
+public class Categoria : EntidadAuditable, IEliminable
 {
     public int Id_Categoria { get; set; }
 
@@ -12,7 +14,13 @@ public class Categoria
 
     public bool? Estado { get; set; }
 
-    public DateTime? Fecha_Creacion { get; set; }
+    /// <summary>Alias de compatibilidad: el JSON de la API mantiene "fecha_Creacion".</summary>
+    [NotMapped]
+    public DateTime? Fecha_Creacion => FechaCreacion;
+
+    [JsonIgnore]
+    public bool Eliminado { get; set; }
+
 
     public virtual ICollection<Producto> Productos { get; set; } = new List<Producto>();
 

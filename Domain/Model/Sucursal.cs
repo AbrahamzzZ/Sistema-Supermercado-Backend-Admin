@@ -1,9 +1,11 @@
-﻿using NetTopologySuite.Geometries;
+using Domain.Model.Common;
+using NetTopologySuite.Geometries;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Domain.Model;
 
-public class Sucursal
+public class Sucursal : EntidadAuditable, IEliminable
 {
     public int Id_Sucursal { get; set; }
 
@@ -20,6 +22,10 @@ public class Sucursal
     public string? Ciudad_Sucursal { get; set; }
 
     public bool? Estado { get; set; }
+
+    [JsonIgnore]
+    public bool Eliminado { get; set; }
+
 
     public virtual Negocio? IdNegocioNavigation { get; set; }
 

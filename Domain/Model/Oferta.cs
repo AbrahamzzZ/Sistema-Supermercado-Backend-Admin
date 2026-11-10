@@ -1,6 +1,10 @@
-﻿namespace Domain.Model;
+using Domain.Model.Common;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
-public class Oferta
+namespace Domain.Model;
+
+public class Oferta : EntidadAuditable, IEliminable
 {
     public int Id_Oferta { get; set; }
 
@@ -20,7 +24,13 @@ public class Oferta
 
     public bool? Estado { get; set; }
 
-    public DateTime? Fecha_Creacion { get; set; }
+    /// <summary>Alias de compatibilidad: el JSON de la API mantiene "fecha_Creacion".</summary>
+    [NotMapped]
+    public DateTime? Fecha_Creacion => FechaCreacion;
+
+    [JsonIgnore]
+    public bool Eliminado { get; set; }
+
 
     public virtual Producto? IdProductoNavigation { get; set; }
 }

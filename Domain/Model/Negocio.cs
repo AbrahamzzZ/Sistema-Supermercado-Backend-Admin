@@ -1,8 +1,10 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using Domain.Model.Common;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Domain.Model;
 
-public class Negocio
+public class Negocio : EntidadAuditable
 {
     public int Id_Negocio { get; set; }
 
@@ -20,6 +22,7 @@ public class Negocio
     public string? ImagenBase64 { get; set; }
 
     public byte[]? Logo { get; set; }
+
 
     public virtual ICollection<Sucursal> Sucursals { get; set; } = new List<Sucursal>();
 }
