@@ -19,4 +19,9 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Stored procedures y datos iniciales: se ejecutan desde las migraciones (ScriptRunner) -->
+    <EmbeddedResource Include="Migrations\Scripts\**\*.sql" />
+  </ItemGroup>
+
 </Project>

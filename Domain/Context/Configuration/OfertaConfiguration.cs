@@ -11,6 +11,9 @@ namespace Domain.Context.Configuration
             builder.ToTable("OFERTA");
             builder.HasKey(e => e.Id_Oferta);
 
+            builder.ConfigurarAuditoria();
+            builder.ConfigurarEliminacionLogica();
+
             builder.Property(e => e.Id_Oferta).HasColumnName("ID_OFERTA");
             builder.Property(e => e.Codigo)
                 .HasMaxLength(10)
@@ -25,10 +28,6 @@ namespace Domain.Context.Configuration
                 .HasColumnType("decimal(5, 2)")
                 .HasColumnName("DESCUENTO");
             builder.Property(e => e.Estado).HasColumnName("ESTADO");
-            builder.Property(e => e.Fecha_Creacion)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnType("datetime")
-                .HasColumnName("FECHA_CREACION");
             builder.Property(e => e.Fecha_Fin).HasColumnName("FECHA_FIN");
             builder.Property(e => e.Fecha_Inicio).HasColumnName("FECHA_INICIO");
             builder.Property(e => e.Id_Producto).HasColumnName("ID_PRODUCTO");

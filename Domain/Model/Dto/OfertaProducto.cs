@@ -12,6 +12,7 @@
         public DateOnly? Fecha_Fin { get; set; }
         public decimal? Descuento { get; set; }
         public bool? Estado { get; set; }
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
         public int TotalCount { get; set; }
         public DateTime? Fecha_Creacion { get; set; }
     }

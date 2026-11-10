@@ -1,0 +1,95 @@
+-- =============================================================
+-- V1 - Módulo Categoría
+-- =============================================================
+CREATE OR ALTER PROCEDURE PA_LISTA_CATEGORIA
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT ID_CATEGORIA, CODIGO, NOMBRE_CATEGORIA, ESTADO,
+           ID_USUARIO_CREACION, FECHA_CREACION, ID_USUARIO_MODIFICACION, FECHA_MODIFICACION, ELIMINADO
+    FROM CATEGORIA
+    WHERE ELIMINADO = 0;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE PA_LISTA_CATEGORIA_PAGINACION(
+    @PageNumber INT = 1,
+    @PageSize INT = 10
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @TotalCount INT;
+    SELECT @TotalCount = COUNT(*) FROM CATEGORIA WHERE ELIMINADO = 0;
+
+    SELECT ID_CATEGORIA, CODIGO, NOMBRE_CATEGORIA, ESTADO,
+           ID_USUARIO_CREACION, FECHA_CREACION, ID_USUARIO_MODIFICACION, FECHA_MODIFICACION, ELIMINADO
+    FROM CATEGORIA
+    WHERE ELIMINADO = 0
+    ORDER BY ID_CATEGORIA
+    OFFSET (@PageNumber - 1) * @PageSize ROWS FETCH NEXT @PageSize ROWS ONLY;
+
+    SELECT @TotalCount AS TotalCount;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE PA_OBTENER_CATEGORIA(
+    @Id_Categoria INT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT ID_CATEGORIA, CODIGO, NOMBRE_CATEGORIA, ESTADO,
+           ID_USUARIO_CREACION, FECHA_CREACION, ID_USUARIO_MODIFICACION, FECHA_MODIFICACION, ELIMINADO
+    FROM CATEGORIA
+    WHERE ID_CATEGORIA = @Id_Categoria AND ELIMINADO = 0;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE PA_REGISTRAR_CATEGORIA(
+    @Codigo VARCHAR(10),
+    @Nombre NVARCHAR(50),
+    @Estado BIT,
+    @Id_Usuario_Creacion INT = NULL
+)
+AS
+BEGIN
+    INSERT INTO CATEGORIA (CODIGO, NOMBRE_CATEGORIA, ESTADO, ID_USUARIO_CREACION)
+    VALUES (@Codigo, @Nombre, @Estado, @Id_Usuario_Creacion);
+END;
+GO
+
+CREATE OR ALTER PROCEDURE PA_EDITAR_CATEGORIA(
+    @Id_Categoria INT,
+    @Nombre NVARCHAR(50),
+    @Estado BIT,
+    @Id_Usuario_Modificacion INT = NULL
+)
+AS
+BEGIN
+    UPDATE CATEGORIA
+    SET NOMBRE_CATEGORIA = @Nombre, ESTADO = @Estado,
+        ID_USUARIO_MODIFICACION = @Id_Usuario_Modificacion, FECHA_MODIFICACION = SYSUTCDATETIME()
+    WHERE ID_CATEGORIA = @Id_Categoria AND ELIMINADO = 0;
+END;
+GO
+
+-- Con borrado lógico la FK ya no impide borrar: se valida a mano que no tenga productos activos.
+-- Error 50547 = equivalente lógico del error 547 (violación de FK) que el servicio ya manejaba.
+CREATE OR ALTER PROCEDURE PA_ELIMINAR_CATEGORIA(
+    @Id_Categoria INT,
+    @Id_Usuario_Modificacion INT = NULL
+)
+AS
+BEGIN
+    IF EXISTS (SELECT 1 FROM PRODUCTO WHERE ID_CATEGORIA = @Id_Categoria AND ELIMINADO = 0)
+        THROW 50547, N'La categoría tiene productos asociados.', 1;
+
+    UPDATE CATEGORIA
+    SET ELIMINADO = 1, ID_USUARIO_MODIFICACION = @Id_Usuario_Modificacion, FECHA_MODIFICACION = SYSUTCDATETIME()
+    WHERE ID_CATEGORIA = @Id_Categoria AND ELIMINADO = 0;
+END;
+GO

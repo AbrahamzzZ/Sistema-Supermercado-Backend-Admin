@@ -4,6 +4,7 @@ using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -12,23 +13,14 @@ namespace Infrastructure.Services
     {
         private readonly CategoriaRepository _categoriaRepository;
         private readonly IValidator<Categoria> _validator;
+        private readonly ILogger<CategoriaService> _logger;
 
-        public CategoriaService(CategoriaRepository categoriaRepository, IValidator<Categoria> validator)
+        public CategoriaService(CategoriaRepository categoriaRepository, IValidator<Categoria> validator, ILogger<CategoriaService> logger)
         {
+            _logger = logger;
             _categoriaRepository = categoriaRepository;
             _validator = validator;
         }
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-        
-        /*readonly ICategoriaRepository _categoriaRepository;
-        private readonly IValidator<Categorium> _validator;
-
-        public CategoriaService(ICategoriaRepository categoriaRepository, IValidator<Categorium> validator)
-        {
-            _categoriaRepository = categoriaRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<List<Categoria>>> ListarCategoriasAsync()
         {
@@ -69,46 +61,46 @@ namespace Infrastructure.Services
             var validationResult = await _validator.ValidateAsync(categoria);
 
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "RegistrarCategoriaAsync", categoria?.Id_Categoria);
 
             var categorias = await _categoriaRepository.ListarCategoriasAsync();
             if (categorias.Any(c => c.Codigo == categoria.Codigo))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El código ya existe" };
+                return ReglaIncumplida<object>("El código ya existe", "RegistrarCategoriaAsync", categoria?.Id_Categoria);
 
             if (categorias.Any(c => c.Nombre_Categoria?.ToLower() == categoria.Nombre_Categoria?.ToLower()))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe" };
+                return ReglaIncumplida<object>("El nombre ya existe", "RegistrarCategoriaAsync", categoria?.Id_Categoria);
 
             var result = await _categoriaRepository.RegistrarCategoriaAsync(categoria);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_REGISTER };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_REGISTER_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_REGISTER_FAILLED, "RegistrarCategoriaAsync", categoria?.Id_Categoria);
         }
 
         public async Task<ApiResponse<object>> EditarCategoriaAsync(Categoria categoria)
         {
             if (categoria == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarCategoriaAsync", categoria?.Id_Categoria);
 
             var validationResult = await _validator.ValidateAsync(categoria);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarCategoriaAsync", categoria?.Id_Categoria);
 
             var categoriaExistente = await _categoriaRepository.ObtenerCategoriaAsync(categoria.Id_Categoria);
             if (categoriaExistente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EditarCategoriaAsync", categoria?.Id_Categoria);
 
             var categorias = await _categoriaRepository.ListarCategoriasAsync();
             if (categorias.Any(c => c.Nombre_Categoria?.ToLower() == categoria.Nombre_Categoria?.ToLower() && c.Id_Categoria != categoria.Id_Categoria))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe." };
+                return ReglaIncumplida<object>("El nombre ya existe.", "EditarCategoriaAsync", categoria?.Id_Categoria);
             }
 
             var result = await _categoriaRepository.EditarCategoriaAsync(categoria);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarCategoriaAsync", categoria?.Id_Categoria);
         }
 
         public async Task<ApiResponse<int>> EliminarCategoriaAsync(int id)
@@ -118,8 +110,7 @@ namespace Infrastructure.Services
                 var existe = await _categoriaRepository.ObtenerCategoriaAsync(id);
                 if (existe == null)
                 {
-                    return new ApiResponse<int>
-                    { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                    return ReglaIncumplida<int>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EliminarCategoriaAsync", id);
                 }
 
                 var result = await _categoriaRepository.EliminarCategoriaAsync(id);
@@ -127,12 +118,19 @@ namespace Infrastructure.Services
                 if (result > 0)
                     return new ApiResponse<int> { IsSuccess = true, Message = Mensajes.MESSAGE_DELETE };
 
-                return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_DELETE_FAILLED };
+                return ReglaIncumplida<int>(Mensajes.MESSAGE_DELETE_FAILLED, "EliminarCategoriaAsync", id);
             }
-            catch (SqlException ex) when (ex.Number == 547) 
+            catch (SqlException ex) when (ex.Number is 547 or 50547) 
             {
-                return new ApiResponse<int> { IsSuccess = false, Message = "No se puede eliminar la categoría porque tiene productos asociados." };
+                return ReglaIncumplida<int>("No se puede eliminar la categoría porque tiene productos asociados.", "EliminarCategoriaAsync", id);
             }
         }
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
+        }
+
     }
 }

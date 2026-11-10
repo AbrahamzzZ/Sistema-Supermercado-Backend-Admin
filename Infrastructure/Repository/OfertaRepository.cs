@@ -2,6 +2,7 @@
 using Domain.Model;
 using Domain.Model.Dto;
 using Infrastructure.Repository.InterfacesRepository;
+using Infrastructure.Security;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
@@ -12,10 +13,12 @@ namespace Infrastructure.Repository
     public class OfertaRepository : IOfertaRepository
     {
         private readonly AdminSistemaSupermercadoContext _context;
+        private readonly ICurrentUserService _currentUser;
 
-        public OfertaRepository(AdminSistemaSupermercadoContext context)
+        public OfertaRepository(AdminSistemaSupermercadoContext context, ICurrentUserService currentUser)
         {
             _context = context;
+            _currentUser = currentUser;
         }
 
         public async Task<List<OfertaProducto>> ListarOfertasAsync()
@@ -73,7 +76,7 @@ namespace Infrastructure.Repository
             var idParam = new SqlParameter("@Id_Oferta", idOferta);
             return await Task.Run(() =>
                 _context.Oferta
-                .FromSqlRaw("EXEC PA_OBTENER_OFERTA @Id_Oferta", idParam)
+                .FromSqlRaw("EXEC PA_OBTENER_OFERTA @Id_Oferta = @Id_Oferta", idParam)
                 .AsNoTracking()
                 .AsEnumerable()
                 .FirstOrDefault()
@@ -84,7 +87,7 @@ namespace Infrastructure.Repository
         {
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_REGISTRAR_OFERTA @Codigo, @Nombre_Oferta, @Id_Producto, @Descripcion, @Fecha_Inicio, @Fecha_Fin, @Descuento, @Estado",
+                "EXEC PA_REGISTRAR_OFERTA @Codigo = @Codigo, @Nombre_Oferta = @Nombre_Oferta, @Id_Producto = @Id_Producto, @Descripcion = @Descripcion, @Fecha_Inicio = @Fecha_Inicio, @Fecha_Fin = @Fecha_Fin, @Descuento = @Descuento, @Estado = @Estado, @Id_Usuario_Creacion = @Id_Usuario_Creacion",
                 new SqlParameter("@Codigo", oferta.Codigo ?? (object)DBNull.Value),
                 new SqlParameter("@Nombre_Oferta", oferta.Nombre_Oferta ?? (object)DBNull.Value),
                 new SqlParameter("@Id_Producto", oferta.Id_Producto ?? (object)DBNull.Value),
@@ -92,7 +95,8 @@ namespace Infrastructure.Repository
                 new SqlParameter("@Fecha_Inicio", oferta.Fecha_Inicio ?? (object)DBNull.Value),
                 new SqlParameter("@Fecha_Fin", oferta.Fecha_Fin ?? (object)DBNull.Value),
                 new SqlParameter("@Descuento", oferta.Descuento ?? (object)DBNull.Value),
-                new SqlParameter("@Estado", oferta.Estado ?? (object)DBNull.Value)
+                new SqlParameter("@Estado", oferta.Estado ?? (object)DBNull.Value),
+                new SqlParameter("@Id_Usuario_Creacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
@@ -100,7 +104,7 @@ namespace Infrastructure.Repository
         {
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_EDITAR_OFERTA @Id_Oferta, @Nombre_Oferta, @Id_Producto, @Descripcion, @Fecha_Inicio, @Fecha_Fin, @Descuento, @Estado",
+                "EXEC PA_EDITAR_OFERTA @Id_Oferta = @Id_Oferta, @Nombre_Oferta = @Nombre_Oferta, @Id_Producto = @Id_Producto, @Descripcion = @Descripcion, @Fecha_Inicio = @Fecha_Inicio, @Fecha_Fin = @Fecha_Fin, @Descuento = @Descuento, @Estado = @Estado, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
                 new SqlParameter("@Id_Oferta", oferta.Id_Oferta),
                 new SqlParameter("@Nombre_Oferta", oferta.Nombre_Oferta ?? (object)DBNull.Value),
                 new SqlParameter("@Id_Producto", oferta.Id_Producto ?? (object)DBNull.Value),
@@ -108,15 +112,17 @@ namespace Infrastructure.Repository
                 new SqlParameter("@Fecha_Inicio", oferta.Fecha_Inicio ?? (object)DBNull.Value),
                 new SqlParameter("@Fecha_Fin", oferta.Fecha_Fin ?? (object)DBNull.Value),
                 new SqlParameter("@Descuento", oferta.Descuento ?? (object)DBNull.Value),
-                new SqlParameter("@Estado", oferta.Estado ?? (object)DBNull.Value)
+                new SqlParameter("@Estado", oferta.Estado ?? (object)DBNull.Value),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
         public async Task<int> EliminarOfertaAsync(int idOferta)
         {
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_ELIMINAR_OFERTA @Id_Oferta",
-                new SqlParameter("@Id_Oferta", idOferta)
+                "EXEC PA_ELIMINAR_OFERTA @Id_Oferta = @Id_Oferta, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
+                new SqlParameter("@Id_Oferta", idOferta),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
     }

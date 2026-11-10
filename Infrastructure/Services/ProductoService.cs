@@ -5,6 +5,7 @@ using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -13,23 +14,14 @@ namespace Infrastructure.Services
     {
         private readonly ProductoRepository _productoRepository;
         private readonly IValidator<Producto> _validator;
+        private readonly ILogger<ProductoService> _logger;
 
-        public ProductoService(ProductoRepository productoRepository, IValidator<Producto> validator)
+        public ProductoService(ProductoRepository productoRepository, IValidator<Producto> validator, ILogger<ProductoService> logger)
         {
+            _logger = logger;
             _productoRepository = productoRepository;
             _validator = validator;
         }
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-
-        /*readonly IProductoRepository _productoRepository;
-        private readonly IValidator<Producto> _validator;
-
-        public ProductoService(IProductoRepository productoRepository, IValidator<Producto> validator)
-        {
-            _productoRepository = productoRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<List<ProductoCategoria>>> ListarProductosAsync()
         {
@@ -70,46 +62,46 @@ namespace Infrastructure.Services
             var validationResult = await _validator.ValidateAsync(producto);
 
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "RegistrarProductoAsync", producto?.Id_Producto);
 
             var productos = await _productoRepository.ListarProductosAsync();
             if (productos.Any(c => c.Codigo == producto.Codigo))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El código ya existe" };
+                return ReglaIncumplida<object>("El código ya existe", "RegistrarProductoAsync", producto?.Id_Producto);
 
             if (productos.Any(c => c.Nombre_Producto?.ToLower() == producto.Nombre_Producto?.ToLower()))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe" };
+                return ReglaIncumplida<object>("El nombre ya existe", "RegistrarProductoAsync", producto?.Id_Producto);
 
             var result = await _productoRepository.RegistrarProductoAsync(producto);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_REGISTER };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_REGISTER_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_REGISTER_FAILLED, "RegistrarProductoAsync", producto?.Id_Producto);
         }
 
         public async Task<ApiResponse<object>> EditarProductoAsync(Producto producto)
         {
             if (producto == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarProductoAsync", producto?.Id_Producto);
 
             var validationResult = await _validator.ValidateAsync(producto);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarProductoAsync", producto?.Id_Producto);
 
             var productoExistente = await _productoRepository.ObtenerProductoAsync(producto.Id_Producto);
             if (productoExistente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EditarProductoAsync", producto?.Id_Producto);
 
             var productos = await _productoRepository.ListarProductosAsync();
             if (productos.Any(c => c.Nombre_Producto?.ToLower() == producto.Nombre_Producto?.ToLower() && c.Id_Producto != producto.Id_Producto))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe." };
+                return ReglaIncumplida<object>("El nombre ya existe.", "EditarProductoAsync", producto?.Id_Producto);
             }
 
             var result = await _productoRepository.EditarProductoAsync(producto);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarProductoAsync", producto?.Id_Producto);
         }
 
         public async Task<ApiResponse<int>> EliminarProductoAsync(int id)
@@ -119,7 +111,7 @@ namespace Infrastructure.Services
                 var existe = await _productoRepository.ObtenerProductoAsync(id);
                 if (existe == null)
                 {
-                    return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                    return ReglaIncumplida<int>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EliminarProductoAsync", id);
                 }
 
                 var result = await _productoRepository.EliminarProductoAsync(id);
@@ -127,13 +119,20 @@ namespace Infrastructure.Services
                 if (result > 0)
                     return new ApiResponse<int> { IsSuccess = true, Message = Mensajes.MESSAGE_DELETE };
 
-                return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_DELETE_FAILLED };
+                return ReglaIncumplida<int>(Mensajes.MESSAGE_DELETE_FAILLED, "EliminarProductoAsync", id);
 
             }
-            catch (SqlException ex) when (ex.Number == 547)
+            catch (SqlException ex) when (ex.Number is 547 or 50547)
             {
-                return new ApiResponse<int> { IsSuccess = false, Message = "No se puede eliminar el producto porque tiene compras y ventas asociadas." };
+                return ReglaIncumplida<int>("No se puede eliminar el producto porque tiene ofertas activas asociadas.", "EliminarProductoAsync", id);
             }
         }
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
+        }
+
     }
 }

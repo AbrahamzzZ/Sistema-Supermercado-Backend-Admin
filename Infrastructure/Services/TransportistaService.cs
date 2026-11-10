@@ -4,6 +4,7 @@ using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -12,22 +13,14 @@ namespace Infrastructure.Services
     {
         private readonly TransportistaRepository _transportistaRepository;
         private readonly IValidator<Transportista> _validator;
+        private readonly ILogger<TransportistaService> _logger;
 
-        public TransportistaService(TransportistaRepository transportistaRepository, IValidator<Transportista> validator)
+        public TransportistaService(TransportistaRepository transportistaRepository, IValidator<Transportista> validator, ILogger<TransportistaService> logger)
         {
+            _logger = logger;
             _transportistaRepository = transportistaRepository;
             _validator = validator;
         }
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-
-        /*readonly ITransportistaRepository _transportistaRepository;
-        private readonly IValidator<Transportistum> _validator;
-        public TransportistaService(ITransportistaRepository transportistaRepository, IValidator<Transportistum> validator)
-        {
-            _transportistaRepository = transportistaRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<List<Transportista>>> ListarTransportistasAsync()
         {
@@ -68,53 +61,53 @@ namespace Infrastructure.Services
             var validationResult = await _validator.ValidateAsync(transportista);
 
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "RegistrarTransportistaAsync", transportista?.Id_Transportista);
 
             var transportistas = await _transportistaRepository.ListarTransportistasAsync();
             if (transportistas.Any(c => c.Codigo == transportista.Codigo))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El código ya existe" };
+                return ReglaIncumplida<object>("El código ya existe", "RegistrarTransportistaAsync", transportista?.Id_Transportista);
 
             if (transportistas.Any(c => c.Cedula == transportista.Cedula))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El cédula ya existe" };
+                return ReglaIncumplida<object>("El cédula ya existe", "RegistrarTransportistaAsync", transportista?.Id_Transportista);
 
             if (transportistas.Any(c => c.Telefono == transportista.Telefono))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El télefono ya existe" };
+                return ReglaIncumplida<object>("El télefono ya existe", "RegistrarTransportistaAsync", transportista?.Id_Transportista);
 
             var result = await _transportistaRepository.RegistrarTransportistaAsync(transportista);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_REGISTER };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_REGISTER_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_REGISTER_FAILLED, "RegistrarTransportistaAsync", transportista?.Id_Transportista);
         }
 
         public async Task<ApiResponse<object>> EditarTransportistaAsync(Transportista transportista)
         {
             if (transportista == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarTransportistaAsync", transportista?.Id_Transportista);
 
             var validationResult = await _validator.ValidateAsync(transportista);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarTransportistaAsync", transportista?.Id_Transportista);
 
             var transportistaExistente = await _transportistaRepository.ObtenerTransportistaAsync(transportista.Id_Transportista);
             if (transportistaExistente == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EditarTransportistaAsync", transportista?.Id_Transportista);
 
             var transportistas = await _transportistaRepository.ListarTransportistasAsync();
             if (transportistas.Any(c => c.Cedula == transportista.Cedula && c.Id_Transportista != transportista.Id_Transportista))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El cédula ya existe." };
+                return ReglaIncumplida<object>("El cédula ya existe.", "EditarTransportistaAsync", transportista?.Id_Transportista);
             }
             else if (transportistas.Any(c => c.Telefono == transportista.Telefono && c.Id_Transportista != transportista.Id_Transportista))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El teléfono ya existe." };
+                return ReglaIncumplida<object>("El teléfono ya existe.", "EditarTransportistaAsync", transportista?.Id_Transportista);
             }
 
             var result = await _transportistaRepository.EditarTransportistaAsync(transportista);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarTransportistaAsync", transportista?.Id_Transportista);
         }
 
         public async Task<ApiResponse<int>> EliminarTransportistaAsync(int id)
@@ -124,8 +117,7 @@ namespace Infrastructure.Services
                 var existe = await _transportistaRepository.ObtenerTransportistaAsync(id);
                 if (existe == null)
                 {
-                    return new ApiResponse<int>
-                    { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                    return ReglaIncumplida<int>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EliminarTransportistaAsync", id);
                 }
 
                 var result = await _transportistaRepository.EliminarTransportistaAsync(id);
@@ -133,12 +125,19 @@ namespace Infrastructure.Services
                 if (result > 0)
                     return new ApiResponse<int> { IsSuccess = true, Message = Mensajes.MESSAGE_DELETE };
 
-                return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_DELETE_FAILLED };
+                return ReglaIncumplida<int>(Mensajes.MESSAGE_DELETE_FAILLED, "EliminarTransportistaAsync", id);
             }
-            catch (SqlException ex) when (ex.Number == 547)
+            catch (SqlException ex) when (ex.Number is 547 or 50547)
             {
-                return new ApiResponse<int> { IsSuccess = false, Message = "No se puede eliminar al transportista porque tiene compras asociadas." };
+                return ReglaIncumplida<int>("No se puede eliminar al transportista porque tiene compras asociadas.", "EliminarTransportistaAsync", id);
             }
+        }
+
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
         }
 
     }

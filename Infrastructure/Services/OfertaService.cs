@@ -5,6 +5,7 @@ using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -13,23 +14,14 @@ namespace Infrastructure.Services
     {
         private readonly OfertaRepository _ofertaRepository;
         private readonly IValidator<Oferta> _validator;
+        private readonly ILogger<OfertaService> _logger;
 
-        public OfertaService(OfertaRepository ofertaRepository, IValidator<Oferta> validator)
+        public OfertaService(OfertaRepository ofertaRepository, IValidator<Oferta> validator, ILogger<OfertaService> logger)
         {
+            _logger = logger;
             _ofertaRepository = ofertaRepository;
             _validator = validator;
         }
-
-        //Para pruebas unitarias, descomenta este constructor y comenta el constructor anterior.
-
-        /*readonly IOfertaRepository _ofertaRepository;
-        private readonly IValidator<Ofertum> _validator;
-
-        public OfertaService(IOfertaRepository ofertaRepository, IValidator<Ofertum> validator)
-        {
-            _ofertaRepository = ofertaRepository;
-            _validator = validator;
-        }*/
 
         public async Task<ApiResponse<List<OfertaProducto>>> ListarOfertasAsync()
         {
@@ -70,42 +62,42 @@ namespace Infrastructure.Services
             var validationResult = await _validator.ValidateAsync(oferta);
 
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "RegistrarOfertaAsync", oferta?.Id_Oferta);
 
             var ofertas = await _ofertaRepository.ListarOfertasAsync();
             if (ofertas.Any(c => c.Codigo == oferta.Codigo))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El código ya existe" };
+                return ReglaIncumplida<object>("El código ya existe", "RegistrarOfertaAsync", oferta?.Id_Oferta);
 
             if (ofertas.Any(c => c.Nombre_Oferta?.ToLower() == oferta.Nombre_Oferta?.ToLower()))
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe" };
+                return ReglaIncumplida<object>("El nombre ya existe", "RegistrarOfertaAsync", oferta?.Id_Oferta);
 
             var result = await _ofertaRepository.RegistrarOfertaAsync(oferta);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_REGISTER };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_REGISTER_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_REGISTER_FAILLED, "RegistrarOfertaAsync", oferta?.Id_Oferta);
         }
 
         public async Task<ApiResponse<object>> EditarOfertaAsync(Oferta oferta)
         {
             if (oferta == null)
-                return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_NULL };
+                return ReglaIncumplida<object>(Mensajes.MESSAGE_NULL, "EditarOfertaAsync", oferta?.Id_Oferta);
 
             var validationResult = await _validator.ValidateAsync(oferta);
             if (!validationResult.IsValid)
-                return new ApiResponse<object> { IsSuccess = false, Message = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)) };
+                return ReglaIncumplida<object>(string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage)), "EditarOfertaAsync", oferta?.Id_Oferta);
 
             var ofertas = await _ofertaRepository.ListarOfertasAsync();
             if (ofertas.Any(c => c.Nombre_Oferta == oferta.Nombre_Oferta && c.Id_Oferta != oferta.Id_Oferta))
             {
-                return new ApiResponse<object> { IsSuccess = false, Message = "El nombre ya existe." };
+                return ReglaIncumplida<object>("El nombre ya existe.", "EditarOfertaAsync", oferta?.Id_Oferta);
             }
 
             var result = await _ofertaRepository.EditarOfertaAsync(oferta);
             if (result > 0)
                 return new ApiResponse<object> { IsSuccess = true, Message = Mensajes.MESSAGE_UPDATE };
 
-            return new ApiResponse<object> { IsSuccess = false, Message = Mensajes.MESSAGE_UPDATE_FAILLED };
+            return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarOfertaAsync", oferta?.Id_Oferta);
         }
 
         public async Task<ApiResponse<int>> EliminarOfertaAsync(int id)
@@ -115,7 +107,7 @@ namespace Infrastructure.Services
                 var existe = await _ofertaRepository.ObtenerOfertaAsync(id);
                 if (existe == null)
                 {
-                    return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_NOT_FOUND };
+                    return ReglaIncumplida<int>(Mensajes.MESSAGE_QUERY_NOT_FOUND, "EliminarOfertaAsync", id);
                 }
 
                 var result = await _ofertaRepository.EliminarOfertaAsync(id);
@@ -123,12 +115,19 @@ namespace Infrastructure.Services
                 if (result > 0)
                     return new ApiResponse<int> { IsSuccess = true, Message = Mensajes.MESSAGE_DELETE };
 
-                return new ApiResponse<int> { IsSuccess = false, Message = Mensajes.MESSAGE_DELETE_FAILLED };
+                return ReglaIncumplida<int>(Mensajes.MESSAGE_DELETE_FAILLED, "EliminarOfertaAsync", id);
             }
-            catch (SqlException ex) when (ex.Number == 547)
+            catch (SqlException ex) when (ex.Number is 547 or 50547)
             {
-                return new ApiResponse<int> { IsSuccess = false, Message = "No se puede eliminar la oferta porque tiene ventas asociadas." };
+                return ReglaIncumplida<int>("No se puede eliminar la oferta porque tiene ventas asociadas.", "EliminarOfertaAsync", id);
             }
         }
+        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
+        private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
+        {
+            _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
+            return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
+        }
+
     }
 }

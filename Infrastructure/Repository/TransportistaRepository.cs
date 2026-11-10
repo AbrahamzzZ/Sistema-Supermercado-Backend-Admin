@@ -1,6 +1,7 @@
 ﻿using Domain.Context;
 using Domain.Model;
 using Infrastructure.Repository.InterfacesRepository;
+using Infrastructure.Security;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
@@ -11,10 +12,12 @@ namespace Infrastructure.Repository
     public class TransportistaRepository : ITransportistaRepository
     {
         private readonly AdminSistemaSupermercadoContext _context;
+        private readonly ICurrentUserService _currentUser;
 
-        public TransportistaRepository(AdminSistemaSupermercadoContext context)
+        public TransportistaRepository(AdminSistemaSupermercadoContext context, ICurrentUserService currentUser)
         {
             _context = context;
+            _currentUser = currentUser;
         }
 
         public async Task<List<Transportista>> ListarTransportistasAsync()
@@ -52,7 +55,7 @@ namespace Infrastructure.Repository
                         reader.GetBytes(7, 0, imagen, 0, (int)length);
                     }
 
-                    transportistas.Add(new Transportista
+                    transportistas.Add(reader.LeerAuditoria(new Transportista
                     {
                         Id_Transportista = reader.GetInt32(0),
                         Codigo = reader.GetString(1),
@@ -62,9 +65,8 @@ namespace Infrastructure.Repository
                         Telefono = reader.GetString(5),
                         Correo_Electronico = reader.GetString(6),
                         Imagen = imagen,
-                        Estado = reader.GetBoolean(8),
-                        Fecha_Registro = reader.GetDateTime(9)
-                    });
+                        Estado = reader.GetBoolean(8)
+                    }));
                 }
 
                 if (await reader.NextResultAsync() && await reader.ReadAsync())
@@ -81,7 +83,7 @@ namespace Infrastructure.Repository
             var idParam = new SqlParameter("@Id_Transportista", idTranportista);
             return await Task.Run(() =>
                 _context.Transportista
-                .FromSqlRaw("EXEC PA_OBTENER_TRANSPORTISTA @Id_Transportista", idParam)
+                .FromSqlRaw("EXEC PA_OBTENER_TRANSPORTISTA @Id_Transportista = @Id_Transportista", idParam)
                 .AsNoTracking()
                 .AsEnumerable()
                 .FirstOrDefault()
@@ -90,60 +92,58 @@ namespace Infrastructure.Repository
 
         public async Task<int> RegistrarTransportistaAsync(Transportista transportista)
         {
-            if (!string.IsNullOrWhiteSpace(transportista.ImagenBase64))
-            {
-                if (transportista.ImagenBase64.Contains(","))
-                {
-                    transportista.ImagenBase64 = transportista.ImagenBase64.Split(',')[1];
-                }
-
-                transportista.Imagen = Convert.FromBase64String(transportista.ImagenBase64);
-            }
+            ConvertirImagen(transportista);
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_REGISTRAR_TRANSPORTISTA @Codigo, @Nombres, @Apellidos, @Cedula, @Telefono, @Correo_Electronico, @Imagen, @Estado",
+                "EXEC PA_REGISTRAR_TRANSPORTISTA @Codigo = @Codigo, @Nombres = @Nombres, @Apellidos = @Apellidos, @Cedula = @Cedula, @Telefono = @Telefono, @Correo_Electronico = @Correo_Electronico, @Imagen = @Imagen, @Estado = @Estado, @Id_Usuario_Creacion = @Id_Usuario_Creacion",
                 new SqlParameter("@Codigo", transportista.Codigo ?? (object)DBNull.Value),
                 new SqlParameter("@Nombres", transportista.Nombres ?? (object)DBNull.Value),
                 new SqlParameter("@Apellidos", transportista.Apellidos ?? (object)DBNull.Value),
                 new SqlParameter("@Cedula", transportista.Cedula ?? (object)DBNull.Value),
                 new SqlParameter("@Telefono", transportista.Telefono ?? (object)DBNull.Value),
                 new SqlParameter("@Correo_Electronico", transportista.Correo_Electronico ?? (object)DBNull.Value),
-                new SqlParameter("@Imagen", transportista.Imagen ?? (object)DBNull.Value),
-                new SqlParameter("@Estado", transportista.Estado ?? (object)DBNull.Value)
+                new SqlParameter("@Imagen", SqlDbType.VarBinary, -1) { Value = transportista.Imagen ?? (object)DBNull.Value },
+                new SqlParameter("@Estado", transportista.Estado ?? (object)DBNull.Value),
+                new SqlParameter("@Id_Usuario_Creacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
         public async Task<int> EditarTransportistaAsync(Transportista transportista)
         {
-            if (!string.IsNullOrWhiteSpace(transportista.ImagenBase64))
-            {
-                if (transportista.ImagenBase64.Contains(","))
-                {
-                    transportista.ImagenBase64 = transportista.ImagenBase64.Split(',')[1];
-                }
-
-                transportista.Imagen = Convert.FromBase64String(transportista.ImagenBase64);
-            }
+            ConvertirImagen(transportista);
 
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_EDITAR_TRANSPORTISTA @Id_Transportista, @Nombres, @Apellidos, @Cedula, @Telefono, @Correo_Electronico, @Imagen, @Estado",
+                "EXEC PA_EDITAR_TRANSPORTISTA @Id_Transportista = @Id_Transportista, @Nombres = @Nombres, @Apellidos = @Apellidos, @Cedula = @Cedula, @Telefono = @Telefono, @Correo_Electronico = @Correo_Electronico, @Imagen = @Imagen, @Estado = @Estado, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
                 new SqlParameter("@Id_Transportista", transportista.Id_Transportista),
                 new SqlParameter("@Nombres", transportista.Nombres ?? (object)DBNull.Value),
                 new SqlParameter("@Apellidos", transportista.Apellidos ?? (object)DBNull.Value),
                 new SqlParameter("@Cedula", transportista.Cedula ?? (object)DBNull.Value),
                 new SqlParameter("@Telefono", transportista.Telefono ?? (object)DBNull.Value),
                 new SqlParameter("@Correo_Electronico", transportista.Correo_Electronico ?? (object)DBNull.Value),
-                new SqlParameter("@Imagen", transportista.Imagen ?? (object)DBNull.Value),
-                new SqlParameter("@Estado", transportista.Estado ?? (object)DBNull.Value)
+                new SqlParameter("@Imagen", SqlDbType.VarBinary, -1) { Value = transportista.Imagen ?? (object)DBNull.Value },
+                new SqlParameter("@Estado", transportista.Estado ?? (object)DBNull.Value),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
         }
 
         public async Task<int> EliminarTransportistaAsync(int idTransportista)
         {
             return await _context.Database.ExecuteSqlRawAsync(
-                "EXEC PA_ELIMINAR_TRANSPORTISTA @Id_Transportista",
-                new SqlParameter("@Id_Transportista", idTransportista)
+                "EXEC PA_ELIMINAR_TRANSPORTISTA @Id_Transportista = @Id_Transportista, @Id_Usuario_Modificacion = @Id_Usuario_Modificacion",
+                new SqlParameter("@Id_Transportista", idTransportista),
+                new SqlParameter("@Id_Usuario_Modificacion", _currentUser.IdUsuario.ComoParametro())
             );
+        }
+
+        private static void ConvertirImagen(Transportista transportista)
+        {
+            if (string.IsNullOrWhiteSpace(transportista.ImagenBase64))
+                return;
+
+            if (transportista.ImagenBase64.Contains(','))
+                transportista.ImagenBase64 = transportista.ImagenBase64.Split(',')[1];
+
+            transportista.Imagen = Convert.FromBase64String(transportista.ImagenBase64);
         }
     }
 }

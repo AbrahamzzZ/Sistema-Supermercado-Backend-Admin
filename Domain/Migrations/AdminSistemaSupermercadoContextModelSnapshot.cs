@@ -38,15 +38,33 @@ namespace Domain.Migrations
                         .HasColumnType("varchar(10)")
                         .HasColumnName("CODIGO");
 
+                    b.Property<bool>("Eliminado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
                     b.Property<bool?>("Estado")
                         .HasColumnType("bit")
                         .HasColumnName("ESTADO");
 
-                    b.Property<DateTime?>("Fecha_Creacion")
+                    b.Property<DateTime>("FechaCreacion")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
+                        .HasColumnType("datetime2")
                         .HasColumnName("FECHA_CREACION")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<string>("Nombre_Categoria")
                         .HasMaxLength(50)
@@ -90,11 +108,29 @@ namespace Domain.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("CORREO_ELECTRONICO");
 
-                    b.Property<DateTime?>("Fecha_Registro")
+                    b.Property<bool>("Eliminado")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("FECHA_REGISTRO")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_CREACION")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<string>("Nombres")
                         .HasMaxLength(30)
@@ -227,9 +263,6 @@ namespace Domain.Migrations
                     b.Property<string>("Nombre_Producto")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("TotalCount")
-                        .HasColumnType("int");
-
                     b.ToTable((string)null);
 
                     b.ToView(null, (string)null);
@@ -261,8 +294,39 @@ namespace Domain.Migrations
                     b.Property<string>("Pais_Origen")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("TotalCount")
+                    b.ToTable((string)null);
+
+                    b.ToView(null, (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Model.Dto.SucursalUbicacion", b =>
+                {
+                    b.Property<string>("Ciudad_Sucursal")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Codigo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Direccion_Sucursal")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("Estado")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("Id_Negocio")
                         .HasColumnType("int");
+
+                    b.Property<int>("Id_Sucursal")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("Latitud")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Longitud")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Nombre_Sucursal")
+                        .HasColumnType("nvarchar(max)");
 
                     b.ToTable((string)null);
 
@@ -289,6 +353,24 @@ namespace Domain.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(60)")
                         .HasColumnName("DIRECCION");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_CREACION")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<byte[]>("Logo")
                         .HasColumnType("varbinary(max)")
@@ -352,15 +434,25 @@ namespace Domain.Migrations
                         .HasDefaultValue(0m)
                         .HasColumnName("DESCUENTO");
 
+                    b.Property<bool>("Eliminado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
                     b.Property<bool?>("Estado")
                         .HasColumnType("bit")
                         .HasColumnName("ESTADO");
 
-                    b.Property<DateTime?>("Fecha_Creacion")
+                    b.Property<DateTime>("FechaCreacion")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
+                        .HasColumnType("datetime2")
                         .HasColumnName("FECHA_CREACION")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
 
                     b.Property<DateOnly?>("Fecha_Fin")
                         .HasColumnType("date")
@@ -369,6 +461,14 @@ namespace Domain.Migrations
                     b.Property<DateOnly?>("Fecha_Inicio")
                         .HasColumnType("date")
                         .HasColumnName("FECHA_INICIO");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<int?>("Id_Producto")
                         .HasColumnType("int")
@@ -407,9 +507,33 @@ namespace Domain.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("DESCRIPCION");
 
+                    b.Property<bool>("Eliminado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
                     b.Property<bool?>("Estado")
                         .HasColumnType("bit")
                         .HasColumnName("ESTADO");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_CREACION")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<int?>("Id_Categoria")
                         .HasColumnType("int")
@@ -465,15 +589,33 @@ namespace Domain.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("CORREO_ELECTRONICO");
 
+                    b.Property<bool>("Eliminado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
                     b.Property<bool?>("Estado")
                         .HasColumnType("bit")
                         .HasColumnName("ESTADO");
 
-                    b.Property<DateTime?>("Fecha_Registro")
+                    b.Property<DateTime>("FechaCreacion")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("FECHA_REGISTRO")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_CREACION")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<string>("Nombres")
                         .HasMaxLength(30)
@@ -519,9 +661,33 @@ namespace Domain.Migrations
                         .HasColumnType("varchar(250)")
                         .HasColumnName("DIRECCION_SUCURSAL");
 
+                    b.Property<bool>("Eliminado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
                     b.Property<bool?>("Estado")
                         .HasColumnType("bit")
                         .HasColumnName("ESTADO");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_CREACION")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<int?>("Id_Negocio")
                         .HasColumnType("int")
@@ -580,15 +746,33 @@ namespace Domain.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("CORREO_ELECTRONICO");
 
+                    b.Property<bool>("Eliminado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ELIMINADO");
+
                     b.Property<bool?>("Estado")
                         .HasColumnType("bit")
                         .HasColumnName("ESTADO");
 
-                    b.Property<DateTime?>("Fecha_Registro")
+                    b.Property<DateTime>("FechaCreacion")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("FECHA_REGISTRO")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_CREACION")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FECHA_MODIFICACION");
+
+                    b.Property<int?>("IdUsuarioCreacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_CREACION");
+
+                    b.Property<int?>("IdUsuarioModificacion")
+                        .HasColumnType("int")
+                        .HasColumnName("ID_USUARIO_MODIFICACION");
 
                     b.Property<byte[]>("Imagen")
                         .HasColumnType("varbinary(max)")

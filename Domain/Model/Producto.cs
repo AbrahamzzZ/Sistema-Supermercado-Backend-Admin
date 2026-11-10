@@ -1,6 +1,9 @@
-﻿namespace Domain.Model;
+using Domain.Model.Common;
+using System.Text.Json.Serialization;
 
-public class Producto
+namespace Domain.Model;
+
+public class Producto : EntidadAuditable, IEliminable
 {
     public int Id_Producto { get; set; }
 
@@ -16,7 +19,12 @@ public class Producto
 
     public bool? Estado { get; set; }
 
+    [JsonIgnore]
+    public bool Eliminado { get; set; }
+
+
     public virtual Categoria? IdCategoriaNavigation { get; set; }
+
 
     public virtual ICollection<Oferta> Oferta { get; set; } = new List<Oferta>();
 }

@@ -11,6 +11,8 @@ namespace Domain.Context.Configuration
             builder.ToTable("NEGOCIO");
             builder.HasKey(e => e.Id_Negocio);
 
+            builder.ConfigurarAuditoria();
+
             builder.HasIndex(e => e.Ruc, "UQ__NEGOCIO__CAF3326B49023C6A").IsUnique();
 
             builder.HasIndex(e => e.Telefono, "UQ__NEGOCIO__D6F1694583FA83D5").IsUnique();
