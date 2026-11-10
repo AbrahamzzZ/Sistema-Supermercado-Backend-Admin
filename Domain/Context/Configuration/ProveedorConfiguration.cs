@@ -11,6 +11,9 @@ namespace Domain.Context.Configuration
             builder.ToTable("PROVEEDOR");
             builder.HasKey(e => e.Id_Proveedor);
 
+            builder.ConfigurarAuditoria();
+            builder.ConfigurarEliminacionLogica();
+
             builder.Property(e => e.Id_Proveedor).HasColumnName("ID_PROVEEDOR");
             builder.Property(e => e.Apellidos)
                 .HasMaxLength(30)
@@ -28,10 +31,6 @@ namespace Domain.Context.Configuration
                 .HasMaxLength(50)
                 .HasColumnName("CORREO_ELECTRONICO");
             builder.Property(e => e.Estado).HasColumnName("ESTADO");
-            builder.Property(e => e.Fecha_Registro)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnType("datetime")
-                .HasColumnName("FECHA_REGISTRO");
             builder.Property(e => e.Nombres)
                 .HasMaxLength(30)
                 .IsUnicode(false)

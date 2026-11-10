@@ -11,6 +11,9 @@ namespace Domain.Context.Configuration
             builder.ToTable("SUCURSAL");
             builder.HasKey(e => e.Id_Sucursal);
 
+            builder.ConfigurarAuditoria();
+            builder.ConfigurarEliminacionLogica();
+
             builder.HasIndex(e => e.Codigo, "UQ__SUCURSAL__CC87E126E64D406E").IsUnique();
 
             builder.Property(e => e.Id_Sucursal).HasColumnName("ID_SUCURSAL");

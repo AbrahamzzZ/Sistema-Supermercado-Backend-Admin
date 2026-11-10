@@ -11,6 +11,9 @@ namespace Domain.Context.Configuration
             builder.ToTable("PRODUCTO");
             builder.HasKey(e => e.Id_Producto);
 
+            builder.ConfigurarAuditoria();
+            builder.ConfigurarEliminacionLogica();
+
             builder.Property(e => e.Id_Producto).HasColumnName("ID_PRODUCTO");
             builder.Property(e => e.Codigo)
                 .HasMaxLength(10)
