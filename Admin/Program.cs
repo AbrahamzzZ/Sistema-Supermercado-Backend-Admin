@@ -1,4 +1,4 @@
-using Admin.Observabilidad;
+using Admin.Middleware;
 using Domain.Context;
 using Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
