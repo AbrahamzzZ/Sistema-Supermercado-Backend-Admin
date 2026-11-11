@@ -1,12 +1,8 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Utilities.Shared;
 
-namespace Admin.Observabilidad
+namespace Admin.Middleware
 {
-    /// <summary>
-    /// Captura cualquier excepción no controlada: la registra como Error (con el CorrelationId)
-    /// y devuelve al cliente un 500 con el formato ApiResponse, sin exponer el stack trace.
-    /// </summary>
     public class GlobalExceptionHandler : IExceptionHandler
     {
         private readonly ILogger<GlobalExceptionHandler> _logger;
