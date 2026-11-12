@@ -1,5 +1,4 @@
 ﻿using Domain.Model;
-using Domain.Model.Dto.Negocio;
 
 namespace Infrastructure.Repository.InterfacesRepository
 {
@@ -7,11 +6,11 @@ namespace Infrastructure.Repository.InterfacesRepository
     {
         Task<Negocio?> ObtenerNegocioAsync(int idNegocio);
         Task<int> EditarNegocioAsync(Negocio negocio);
-        Task<List<ProductoMasComprado>> ObtenerProductoMasComprado();
-        Task<List<ProductoMasVendido>> ObtenerProductoMasVendido();
-        Task<List<TopCliente>> ObtenerTopClientes();
-        Task<List<TopProveedor>> ObtenerTopProveedores();
-        Task<List<ViajesTransportista>> ObtenerViajesTransportista();
-        Task<List<EmpleadoProductivo>> ObtenerEmpleadosProductivos();
+        Task<Dictionary<int, string>> ObtenerNombresProductosAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, string>> ObtenerNombresClientesAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, string>> ObtenerNombresProveedoresAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, string>> ObtenerNombresTransportistasAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, string>> ObtenerProductosActivosAsync();
+        Task<List<string>> ObtenerNombresCategoriasAsync();
     }
 }

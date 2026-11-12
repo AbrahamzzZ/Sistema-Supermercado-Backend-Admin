@@ -56,34 +56,53 @@ namespace Infrastructure.Repository
             );
         }
 
-        public async Task<List<ProductoMasComprado>> ObtenerProductoMasComprado()
+
+        public async Task<Dictionary<int, string>> ObtenerNombresProductosAsync(IEnumerable<int> ids)
         {
-            return await _context.ProductoMasComprados.FromSqlRaw("EXEC PA_PRODUCTOS_MAS_COMPRADOS").ToListAsync();
+            var lista = ids.Distinct().ToList();
+            return await _context.Producto.AsNoTracking()
+                .Where(p => lista.Contains(p.Id_Producto))
+                .ToDictionaryAsync(p => p.Id_Producto, p => p.Nombre_Producto ?? "");
         }
 
-        public async Task<List<ProductoMasVendido>> ObtenerProductoMasVendido()
+        public async Task<Dictionary<int, string>> ObtenerNombresClientesAsync(IEnumerable<int> ids)
         {
-            return await _context.ProductoMasVendidos.FromSqlRaw("EXEC PA_PRODUCTOS_MAS_VENDIDOS").ToListAsync();
+            var lista = ids.Distinct().ToList();
+            return await _context.Cliente.AsNoTracking()
+                .Where(c => lista.Contains(c.Id_Cliente))
+                .ToDictionaryAsync(c => c.Id_Cliente, c => $"{c.Nombres} {c.Apellidos}".Trim());
         }
 
-        public async Task<List<TopCliente>> ObtenerTopClientes()
+        public async Task<Dictionary<int, string>> ObtenerNombresProveedoresAsync(IEnumerable<int> ids)
         {
-            return await _context.TopClientes.FromSqlRaw("EXEC PA_TOP_CLIENTES").ToListAsync();
+            var lista = ids.Distinct().ToList();
+            return await _context.Proveedor.AsNoTracking()
+                .Where(p => lista.Contains(p.Id_Proveedor))
+                .ToDictionaryAsync(p => p.Id_Proveedor, p => $"{p.Nombres} {p.Apellidos}".Trim());
         }
 
-        public async Task<List<TopProveedor>> ObtenerTopProveedores()
+        public async Task<Dictionary<int, string>> ObtenerNombresTransportistasAsync(IEnumerable<int> ids)
         {
-            return await _context.TopProveedores.FromSqlRaw("EXEC PA_TOP_PROVEEDORES").ToListAsync();
+            var lista = ids.Distinct().ToList();
+            return await _context.Transportista.AsNoTracking()
+                .Where(t => lista.Contains(t.Id_Transportista))
+                .ToDictionaryAsync(t => t.Id_Transportista, t => $"{t.Nombres} {t.Apellidos}".Trim());
         }
 
-        public async Task<List<ViajesTransportista>> ObtenerViajesTransportista()
+        public async Task<Dictionary<int, string>> ObtenerProductosActivosAsync()
         {
-            return await _context.ViajesTransportistas.FromSqlRaw("PA_VIAJES_TRANSPORTISTA").ToListAsync();
+            return await _context.Producto.AsNoTracking()
+                .Where(p => !p.Eliminado)
+                .ToDictionaryAsync(p => p.Id_Producto, p => p.Nombre_Producto ?? "");
         }
 
-        public async Task<List<EmpleadoProductivo>> ObtenerEmpleadosProductivos()
+        public async Task<List<string>> ObtenerNombresCategoriasAsync()
         {
-            return await _context.EmpleadoProductivos.FromSqlRaw("EXEC PA_VENTAS_EMPLEADO").ToListAsync();
+            return await _context.Categoria.AsNoTracking()
+                .Where(c => !c.Eliminado)
+                .OrderBy(c => c.Nombre_Categoria)
+                .Select(c => c.Nombre_Categoria ?? "")
+                .ToListAsync();
         }
     }
 }
