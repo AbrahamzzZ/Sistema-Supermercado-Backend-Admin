@@ -25,6 +25,7 @@
         public const string MESSAGE_IA_FAILLED = "La pregunta no está relacionada con nada del negocio.";
         public const string MESSAGE_IA_SIN_DATOS = "No hay datos suficientes para responder esa pregunta.";
         public const string MESSAGE_IA_NO_DISPONIBLE = "El servicio de IA no está disponible en este momento.";
+        public const string MESSAGE_LOGS_NO_DISPONIBLES = "No se pudieron consultar los logs. Verifique que Seq esté disponible.";
         public const string MESSAGE_SERVICIO_NO_DISPONIBLE = "No se pudieron obtener los datos de otro servicio. Intente nuevamente.";
     }
 }

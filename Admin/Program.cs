@@ -54,6 +54,15 @@ builder.Services.AddHttpClient(MicroserviciosApiClient.NombreHttpClient, client 
 })
 .AddHttpMessageHandler<TokenDelegatingHandler>();
 
+builder.Services.AddHttpClient(SeqLogService.NombreHttpClient, client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Seq:ServerUrl"] ?? "http://localhost:5341");
+    client.Timeout = TimeSpan.FromSeconds(15);
+    var apiKey = builder.Configuration["Seq:ApiKey"];
+    if (!string.IsNullOrWhiteSpace(apiKey))
+        client.DefaultRequestHeaders.Add("X-Seq-ApiKey", apiKey);
+});
+
 // JWT Auth
 builder.Services.AddAuthentication(options =>
 {
@@ -151,6 +160,16 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 
 app.UseRouting();
 app.UseAuthentication();
+// Agrega el usuario (del token) y el método HTTP a todos los logs de la petición: así aparecen en Seq
+// y en la pantalla "Log" de la app. Va después de UseAuthentication para que el usuario ya esté leído.
+app.Use(async (context, next) =>
+{
+    using (Serilog.Context.LogContext.PushProperty("IdUsuario", context.User.FindFirstValue(ClaimTypes.NameIdentifier)))
+    using (Serilog.Context.LogContext.PushProperty("RequestMethod", context.Request.Method))
+    {
+        await next();
+    }
+});
 
 app.UseAuthorization();
 
