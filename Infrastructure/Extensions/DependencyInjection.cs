@@ -35,6 +35,7 @@ namespace Infrastructure.Extensions
             services.AddScoped<ProveedorService>();
             services.AddScoped<TransportistaService>();
             services.AddScoped<NegocioService>();
+            services.AddScoped<MicroserviciosApiClient>();
             services.AddScoped<ProductoService>();
             services.AddScoped<OfertaService>();
             services.AddScoped<SucursalService>();

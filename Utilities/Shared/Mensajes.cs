@@ -21,5 +21,10 @@
         public const string MESSAGE_CEDULA = "El campo debe contener una cédula válida de 10 dígitos.";
         public const string MESSAGE_EMAIL = "El campo debe contener un correo electrónico válido.";
         public const string MESSAGE_DETAILS_EMPTY = "Debe ingresar al menos un detalle.";
+        public const string MESSAGE_IA = "Análisis generado exitosamente.";
+        public const string MESSAGE_IA_FAILLED = "La pregunta no está relacionada con nada del negocio.";
+        public const string MESSAGE_IA_SIN_DATOS = "No hay datos suficientes para responder esa pregunta.";
+        public const string MESSAGE_IA_NO_DISPONIBLE = "El servicio de IA no está disponible en este momento.";
+        public const string MESSAGE_SERVICIO_NO_DISPONIBLE = "No se pudieron obtener los datos de otro servicio. Intente nuevamente.";
     }
 }

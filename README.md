@@ -9,8 +9,8 @@ transportistas, sucursales, ofertas y datos del negocio.
 ## Responsabilidad
 
 - CRUD de los datos maestros que usan el resto de servicios
-- Reportes del negocio (productos más vendidos/comprados, top clientes y proveedores, etc.) — ver [Pendientes](#pendientes)
-- Análisis con IA de los productos más vendidos usando **Ollama** (`qwen3:8b`)
+- Reportes del negocio (productos más vendidos/comprados, top clientes y proveedores, etc.) — ver [Reportes del negocio](#reportes-del-negocio)
+- Asistente de IA sobre los datos del negocio usando **Ollama** (`qwen3:8b`)
 - Ubicación geográfica de sucursales (tipo `geography` de SQL Server con NetTopologySuite)
 
 **Base de datos:** `DB_Admin` — tablas `PRODUCTO`, `CATEGORIA`, `CLIENTE`, `PROVEEDOR`, `TRANSPORTISTA`,
@@ -20,13 +20,15 @@ transportistas, sucursales, ofertas y datos del negocio.
 
 ```
 Admin/                    API (controllers, Program.cs, appsettings)
-  Observabilidad/         CorrelationIdMiddleware y GlobalExceptionHandler
+  Middleware/             CorrelationIdMiddleware y GlobalExceptionHandler
 Domain/                   Entidades, DTOs, DbContext, configuraciones EF, Mapper y Migrations
   Model/Common/           EntidadAuditable e IEliminable (auditoría y borrado lógico)
   Migrations/Scripts/     Stored procedures y datos iniciales (.sql embebidos)
 Infrastructure/           Repositorios, servicios y validadores (FluentValidation)
   Security/               ICurrentUserService (usuario del token para la auditoría)
-Utilities/                ApiResponse, mensajes, paginación y cliente de Ollama
+  Handler/                TokenDelegatingHandler (reenvía token y X-Correlation-Id a otros microservicios)
+  Services/               Servicios y MicroserviciosApiClient (Order, Inventory y Auth vía Gateway)
+Utilities/                ApiResponse, mensajes, paginación, cliente de Ollama y reglas del asistente de IA
 ```
 
 ## Endpoints
@@ -45,18 +47,20 @@ Cada uno de estos recursos tiene el mismo CRUD:
 | PUT | `/api/{Recurso}/{id}` | Edita |
 | DELETE | `/api/{Recurso}/{id}` | Elimina (**borrado lógico**) |
 
-Negocio y reportes:
+Negocio y reportes (mismas rutas que el monolito, las usa el frontend):
 
-| Método | Ruta |
-|---|---|
-| GET / PUT | `/api/Negocio/{id}` |
-| GET | `/api/Negocio/producto-mas-comprado` |
-| GET | `/api/Negocio/producto-mas-vendido` |
-| GET | `/api/Negocio/producto-mas-vendido-ia` *(usa Ollama)* |
-| GET | `/api/Negocio/top-clientes` |
-| GET | `/api/Negocio/top-proveedores` |
-| GET | `/api/Negocio/viajes-transportista` |
-| GET | `/api/Negocio/empleados-productivos` |
+| Método | Ruta | Datos |
+|---|---|---|
+| GET / PUT | `/api/Negocio/{id}` | `DB_Admin` |
+| GET | `/api/Negocio/productos-mas-comprados` | Top 5 · Order + nombres de `DB_Admin` |
+| GET | `/api/Negocio/productos-mas-vendidos` | Top 5 · Order + nombres de `DB_Admin` |
+| GET | `/api/Negocio/top-clientes` | Top 5 · Order + nombres de `DB_Admin` |
+| GET | `/api/Negocio/top-proveedores` | Top 5 · Order + nombres de `DB_Admin` |
+| GET | `/api/Negocio/viajes-transportista` | Top 5 · Order + nombres de `DB_Admin` |
+| GET | `/api/Negocio/empleados-productivos` | Top 5 · Order + nombres de Auth |
+| POST | `/api/Negocio/analisis-ia` | Body `{ "prompt": "..." }` · usa Ollama |
+
+Si todavía no hay compras o ventas, los reportes responden `404` con `"No se encontraron registros."`.
 
 Las respuestas incluyen ahora los campos de auditoría `idUsuarioCreacion`, `fechaCreacion`,
 `idUsuarioModificacion` y `fechaModificacion`. Los nombres antiguos (`fecha_Registro`, `fecha_Creacion`) se
@@ -69,6 +73,48 @@ Swagger: http://localhost:8001/swagger (Docker) · https://localhost:7047/swagge
 **Order** e **Inventory** llaman a `GET /admin/{Recurso}/{id}` **a través del Gateway** para validar que un
 producto, cliente, proveedor, sucursal o transportista existe y para mostrar sus datos.
 Un registro eliminado (lógicamente) responde 404, así que ya no se puede usar en compras o ventas nuevas.
+
+## Reportes del negocio
+
+Las compras y ventas viven en `DB_Order` y los nombres en `DB_Admin` (y en `DB_Auth` los empleados), así que un
+reporte no se puede resolver con un solo `JOIN` como en el monolito. Cada microservicio aporta lo suyo:
+
+```
+Front ──► Gateway ──► Admin  GET /api/Negocio/top-clientes
+                        │
+                        ├─► Gateway ──► Order  GET /api/Estadistica/top-clientes   →  [{ id: 3, total: 12 }, ...]
+                        │
+                        └─► DB_Admin: nombres de esos IDs                          →  [{ nombre_Completo: "Ana Ruiz", compras_Totales: 12 }]
+```
+
+- **Order** (`/api/Estadistica/...`) devuelve solo **IDs y totales** (top 5), calculados con los SP
+  `PA_ESTADISTICA_*` sobre sus tablas.
+- **Admin** busca los nombres de esos IDs en `DB_Admin` en una sola consulta, **incluidos los registros
+  eliminados** (un reporte histórico debe mostrar el nombre de un cliente aunque ya se haya eliminado). Si un ID
+  no existe, muestra `Cliente #ID`.
+- **Empleados productivos:** los empleados son usuarios de Auth; Admin consulta `GET /auth/Usuario/{id}` por
+  cada uno (máximo 5).
+- Las llamadas pasan por el Gateway (`Services:GatewayUrl`) reenviando el token del usuario y el
+  `X-Correlation-Id` (`Infrastructure/Handler/TokenDelegatingHandler.cs`), así en Seq se ve el recorrido completo.
+- Si Order no responde, el reporte devuelve `"No se pudieron obtener los datos de otro servicio..."` y se
+  registra como `Error`.
+
+### Asistente de IA (`POST /api/Negocio/analisis-ia`)
+
+Mismas reglas que el monolito (`Utilities/IA/Reglas.cs`): según las palabras de la pregunta se eligen los datos
+que se envían a Ollama:
+
+| La pregunta habla de… | Datos que recibe la IA | Origen |
+|---|---|---|
+| productos, artículos | Productos y su stock | `DB_Admin` + Inventory (`GET /inventory/ProductoStock`) |
+| categorías, secciones | Categorías | `DB_Admin` |
+| clientes | Top clientes | Order + `DB_Admin` |
+| proveedores | Top proveedores | Order + `DB_Admin` |
+| ventas, vendidos | Unidades vendidas por producto y día | Order + `DB_Admin` |
+| compras, comprados | Unidades compradas por producto y día | Order + `DB_Admin` |
+| otra cosa | — | Responde `"La pregunta no está relacionada con nada del negocio."` |
+
+Si Ollama no está disponible responde `"El servicio de IA no está disponible en este momento."` (log `Error`).
 
 ## Auditoría y borrado lógico
 
@@ -125,6 +171,7 @@ Todos llevan las propiedades `Servicio = Admin` y `CorrelationId`.
 | `Jwt:RequireHttpsMetadata` | `false` solo dentro de Docker (http) |
 | `Jwt:Issuer` / `Jwt:Audience` | Deben coincidir con los de Auth |
 | `Ollama:BaseUrl` | URL de Ollama (local: `http://localhost:11434`; Docker: `http://host.docker.internal:11434`) |
+| `Services:GatewayUrl` | URL del Gateway, para los reportes (local: `https://localhost:7134`; Docker: `http://gateway:8080`) |
 | `Seq:ServerUrl` | URL de Seq (local: `http://localhost:5341`; Docker: `http://seq:80`) |
 | `Serilog:MinimumLevel` | Nivel mínimo de log y overrides por categoría |
 
@@ -136,8 +183,9 @@ Este servicio **no tiene ninguna clave JWT**: solo valida tokens con la clave p�
 dotnet run --project Admin --launch-profile https
 ```
 
-Requiere que **Auth** esté corriendo (para validar tokens). Para el reporte con IA, Ollama debe estar activo
-con el modelo descargado: `ollama pull qwen3:8b`. Para ver los logs en Seq localmente, levanta el contenedor
+Requiere que **Auth** esté corriendo (para validar tokens). Los reportes necesitan además el **Gateway** y
+**Order** (e **Inventory** para el análisis de productos con IA). Para el asistente de IA, Ollama debe estar
+activo con el modelo descargado: `ollama pull qwen3:8b`. Para ver los logs en Seq localmente, levanta el contenedor
 `seq` desde el `docker-compose.yml` del Gateway.
 
 ## Migraciones (EF Core Code First)
@@ -183,13 +231,6 @@ Para cambios de tablas, modifica las entidades y su configuración y genera la m
 ```bash
 dotnet ef migrations add NombreMigracion --project Domain --startup-project Admin
 ```
-
-## Pendientes
-
-- **Reportes de Negocio:** `PA_PRODUCTOS_MAS_COMPRADOS`, `PA_PRODUCTOS_MAS_VENDIDOS`, `PA_TOP_CLIENTES`,
-  `PA_TOP_PROVEEDORES`, `PA_VIAJES_TRANSPORTISTA` y `PA_VENTAS_EMPLEADO` **no se crean en la migración**:
-  necesitan datos de compras y ventas, que viven en `DB_Order` (otro microservicio) y no se pueden consultar
-  desde `DB_Admin`. Mientras tanto, los endpoints de reportes de `/api/Negocio/...` responden con error.
 
 ## Docker
 

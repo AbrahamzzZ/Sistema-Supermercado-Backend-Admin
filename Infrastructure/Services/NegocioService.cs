@@ -1,11 +1,10 @@
 ﻿using Domain.Model;
 using Domain.Model.Dto.Negocio;
-using Infrastructure.Repository.InterfacesRepository;
 using FluentValidation;
 using Infrastructure.Repository;
 using Infrastructure.Repository.InterfacesServices;
-using Utilities.IA;
 using Microsoft.Extensions.Logging;
+using Utilities.IA;
 using Utilities.Shared;
 
 namespace Infrastructure.Services
@@ -15,14 +14,17 @@ namespace Infrastructure.Services
         private readonly NegocioRepository _negocioRepository;
         private readonly IValidator<Negocio> _validator;
         private readonly OllamaClient _ollama;
+        private readonly MicroserviciosApiClient _microservicios;
         private readonly ILogger<NegocioService> _logger;
 
-        public NegocioService(NegocioRepository negocioRepository, IValidator<Negocio> validator, OllamaClient ollama, ILogger<NegocioService> logger)
+        public NegocioService(NegocioRepository negocioRepository, IValidator<Negocio> validator, OllamaClient ollama,
+            MicroserviciosApiClient microservicios, ILogger<NegocioService> logger)
         {
             _logger = logger;
             _negocioRepository = negocioRepository;
             _validator = validator;
             _ollama = ollama;
+            _microservicios = microservicios;
         }
 
         public async Task<ApiResponse<Negocio>> ObtenerNegocioAsync(int idNegocio)
@@ -54,115 +56,143 @@ namespace Infrastructure.Services
             return ReglaIncumplida<object>(Mensajes.MESSAGE_UPDATE_FAILLED, "EditarNegocioAsync", negocio?.Id_Negocio);
         }
 
-        public async Task<ApiResponse<List<ProductoMasComprado>>> ObtenerProductoMasComprado()
+        public Task<ApiResponse<List<ProductoMasComprado>>> ObtenerProductoMasComprado()
+            => ReporteAsync("productos-comprados", _negocioRepository.ObtenerNombresProductosAsync, "Producto", (nombre, total) => new ProductoMasComprado { Nombre_Producto = nombre, Cantidad_Comprada = total });
+
+        public Task<ApiResponse<List<ProductoMasVendido>>> ObtenerProductoMasVendido()
+            => ReporteAsync("productos-vendidos", _negocioRepository.ObtenerNombresProductosAsync, "Producto", (nombre, total) => new ProductoMasVendido { Nombre_Producto = nombre, Cantidad_Vendida = total });
+
+        public Task<ApiResponse<List<TopCliente>>> ObtenerTopClientes()
+            => ReporteAsync("top-clientes", _negocioRepository.ObtenerNombresClientesAsync, "Cliente", (nombre, total) => new TopCliente { Nombre_Completo = nombre, Compras_Totales = total });
+
+        public Task<ApiResponse<List<TopProveedor>>> ObtenerTopProveedores()
+            => ReporteAsync("top-proveedores", _negocioRepository.ObtenerNombresProveedoresAsync, "Proveedor", (nombre, total) => new TopProveedor { Nombre_Completo = nombre, Compras_Totales = total });
+
+        public Task<ApiResponse<List<ViajesTransportista>>> ObtenerViajesTransportista()
+            => ReporteAsync("viajes-transportista", _negocioRepository.ObtenerNombresTransportistasAsync, "Transportista", (nombre, total) => new ViajesTransportista { Nombre_Completo = nombre, Viajes_Realizados = total });
+
+        public Task<ApiResponse<List<EmpleadoProductivo>>> ObtenerEmpleadosProductivos()
+            => ReporteAsync("ventas-empleado", NombresEmpleadosAsync, "Empleado", (nombre, total) => new EmpleadoProductivo { Nombre_Completo = nombre, Ventas_Empleado = total });
+
+        private async Task<ApiResponse<List<T>>> ReporteAsync<T>(
+            string reporte,
+            Func<IEnumerable<int>, Task<Dictionary<int, string>>> obtenerNombres,
+            string etiqueta,
+            Func<string, int, T> crear)
         {
-            var lista = await _negocioRepository.ObtenerProductoMasComprado();
+            var totales = await _microservicios.ObtenerEstadisticaAsync(reporte);
+            if (totales == null)
+                return new ApiResponse<List<T>> { IsSuccess = false, Message = Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE };
 
-            if (lista == null)
-                return new ApiResponse<List<ProductoMasComprado>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
+            if (totales.Count == 0)
+                return new ApiResponse<List<T>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
 
-            return new ApiResponse<List<ProductoMasComprado>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
+            var nombres = await obtenerNombres(totales.Select(t => t.Id));
+            var lista = totales
+                .Select(t => crear(nombres.GetValueOrDefault(t.Id) ?? $"{etiqueta} #{t.Id}", t.Total))
+                .ToList();
+
+            _logger.LogInformation("Reporte {Reporte} generado con {Cantidad} registros", reporte, lista.Count);
+            return new ApiResponse<List<T>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
         }
 
-        public async Task<ApiResponse<List<ProductoMasVendido>>> ObtenerProductoMasVendido()
+        private async Task<Dictionary<int, string>> NombresEmpleadosAsync(IEnumerable<int> ids)
         {
-            var lista = await _negocioRepository.ObtenerProductoMasVendido();
-
-            if (lista == null || lista.Count == 0)
-                return new ApiResponse<List<ProductoMasVendido>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
-
-            return new ApiResponse<List<ProductoMasVendido>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
+            var nombres = new Dictionary<int, string>();
+            foreach (var id in ids.Distinct())
+            {
+                var nombre = await _microservicios.ObtenerNombreUsuarioAsync(id);
+                if (!string.IsNullOrWhiteSpace(nombre))
+                    nombres[id] = nombre;
+            }
+            return nombres;
         }
 
-
-        public async Task<ApiResponse<object>> ObtenerProductoMasVendidoIA()
+        public async Task<ApiResponse<string>> AnalisisIA(string? prompt)
         {
-            var lista = await _negocioRepository.ObtenerProductoMasVendido();
+            var tipo = Reglas.DetectarTipoAnalisis(prompt);
+            if (tipo == TipoAnalisis.Invalido)
+                return ReglaIncumplida<string>(Mensajes.MESSAGE_IA_FAILLED, "AnalisisIA");
 
-            if (lista == null || lista.Count == 0)
-                return new ApiResponse<object> { IsSuccess = false, Message = "No hay datos." };
+            var datos = await ObtenerDatosAnalisisAsync(tipo);
+            if (datos == null)
+                return new ApiResponse<string> { IsSuccess = false, Message = Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE };
 
-            // Convertimos los datos a texto para enviarlos a la IA
-            string texto = string.Join("\n", lista.Select(x => $"{x.Nombre_Producto}: {x.Cantidad_Vendida} unidades"));
+            if (string.IsNullOrWhiteSpace(datos))
+                return ReglaIncumplida<string>(Mensajes.MESSAGE_IA_SIN_DATOS, "AnalisisIA");
 
-            string prompt = $@"Analiza estos productos y sus cantidades vendidas: {texto}
-            Formato requerido:
-            - Producto más vendido.
-            - Comparación rápida entre productos.
-            - Si existe o no una tendencia clara.
+            var promptFinal = $"Analiza estos datos y responde en máximo 3 líneas: {datos} Pregunta: {prompt}";
 
-            No escribas más de 5 líneas.
-            Sé directo e informativo.
-            ";
-            string analisisIA;
+            string respuesta;
             try
             {
-                analisisIA = await _ollama.GenerateAsync(prompt);
+                respuesta = await _ollama.GenerateAsync(promptFinal);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
             {
-                // Fallo técnico (Ollama caído, timeout o respuesta inválida): nivel Error
-                _logger.LogError(ex, "Error al generar el análisis con IA (Ollama) para {CantidadProductos} productos", lista.Count);
-                return new ApiResponse<object> { IsSuccess = false, Message = "El servicio de IA no está disponible en este momento." };
+                _logger.LogError(ex, "Error al generar el análisis con IA (Ollama) de tipo {TipoAnalisis}", tipo);
+                return new ApiResponse<string> { IsSuccess = false, Message = Mensajes.MESSAGE_IA_NO_DISPONIBLE };
             }
 
-            return new ApiResponse<object>
+            _logger.LogInformation("Análisis con IA de tipo {TipoAnalisis} generado", tipo);
+            return new ApiResponse<string> { IsSuccess = true, Message = Mensajes.MESSAGE_IA, Data = respuesta };
+        }
+
+        private async Task<string?> ObtenerDatosAnalisisAsync(TipoAnalisis tipo)
+        {
+            switch (tipo)
             {
-                IsSuccess = true,
-                Message = "Análisis generado",
-                Data = new
+                case TipoAnalisis.Producto:
                 {
-                    productos = lista,
-                    analisis = analisisIA
+                    var productos = await _negocioRepository.ObtenerProductosActivosAsync();
+                    var stocks = await _microservicios.ObtenerStocksAsync();
+                    if (stocks == null) return null;
+
+                    var stockPorProducto = stocks.ToDictionary(s => s.IdProducto, s => s.Stock);
+                    return string.Join("\n", productos.Select(p => $"{p.Value}: {stockPorProducto.GetValueOrDefault(p.Key)} unidades en stock"));
                 }
-            };
+
+                case TipoAnalisis.Categoria:
+                    return string.Join("\n", await _negocioRepository.ObtenerNombresCategoriasAsync());
+
+                case TipoAnalisis.Cliente:
+                    return await TextoReporteAsync(ObtenerTopClientes(), x => $"{x.Nombre_Completo}: {x.Compras_Totales} compras");
+
+                case TipoAnalisis.Proveedor:
+                    return await TextoReporteAsync(ObtenerTopProveedores(), x => $"{x.Nombre_Completo}: {x.Compras_Totales} compras");
+
+                case TipoAnalisis.Comprado:
+                    return await TextoTendenciaAsync("tendencia-comprados", "unidades compradas");
+
+                case TipoAnalisis.Vendido:
+                    return await TextoTendenciaAsync("tendencia-vendidos", "unidades vendidas");
+
+                default:
+                    return "";
+            }
         }
 
-        public async Task<ApiResponse<List<TopCliente>>> ObtenerTopClientes()
+        private static async Task<string?> TextoReporteAsync<T>(Task<ApiResponse<List<T>>> reporte, Func<T, string> formato)
         {
-            var lista = await _negocioRepository.ObtenerTopClientes();
-
-            if (lista == null || lista.Count == 0)
-                return new ApiResponse<List<TopCliente>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
-
-            return new ApiResponse<List<TopCliente>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
+            var respuesta = await reporte;
+            if (respuesta.Message == Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE) return null;
+            return string.Join("\n", (respuesta.Data ?? []).Select(formato));
         }
 
-        public async Task<ApiResponse<List<TopProveedor>>> ObtenerTopProveedores()
+        private async Task<string?> TextoTendenciaAsync(string reporte, string unidad)
         {
-            var lista = await _negocioRepository.ObtenerTopProveedores();
+            var tendencia = await _microservicios.ObtenerTendenciaAsync(reporte);
+            if (tendencia == null) return null;
 
-            if (lista == null || lista.Count == 0)
-                return new ApiResponse<List<TopProveedor>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
-
-            return new ApiResponse<List<TopProveedor>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
+            var nombres = await _negocioRepository.ObtenerNombresProductosAsync(tendencia.Select(t => t.IdProducto));
+            return string.Join("\n", tendencia.Select(t =>
+                $"{nombres.GetValueOrDefault(t.IdProducto) ?? $"Producto #{t.IdProducto}"} ({t.Fecha:dd/MM/yyyy}): {t.Cantidad} {unidad}"));
         }
 
-        public async Task<ApiResponse<List<ViajesTransportista>>> ObtenerViajesTransportista()
-        {
-            var lista = await _negocioRepository.ObtenerViajesTransportista();
-
-            if (lista == null || lista.Count == 0)
-                return new ApiResponse<List<ViajesTransportista>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
-
-            return new ApiResponse<List<ViajesTransportista>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
-        }
-
-        public async Task<ApiResponse<List<EmpleadoProductivo>>> ObtenerEmpleadosProductivos()
-        {
-            var lista = await _negocioRepository.ObtenerEmpleadosProductivos();
-
-            if (lista == null || lista.Count == 0)
-                return new ApiResponse<List<EmpleadoProductivo>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY };
-
-            return new ApiResponse<List<EmpleadoProductivo>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = lista };
-        }
-        /// <summary>Regla de negocio incumplida: se registra como Warning (Information = éxito, Error = fallo técnico).</summary>
         private ApiResponse<T> ReglaIncumplida<T>(string? mensaje, string operacion, object? id = null)
         {
             _logger.LogWarning("Regla de negocio incumplida en {Operacion} (Id: {Id}): {Mensaje}", operacion, id, mensaje);
             return new ApiResponse<T> { IsSuccess = false, Message = mensaje };
         }
-
     }
 }
