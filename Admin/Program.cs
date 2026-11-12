@@ -1,6 +1,8 @@
 using Admin.Middleware;
 using Domain.Context;
 using Infrastructure.Extensions;
+using Infrastructure.Handler;
+using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,7 +13,6 @@ using Utilities.IA;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Logs estructurados: consola + Seq (en Docker Seq__ServerUrl=http://seq:80)
 builder.Host.UseSerilog((ctx, sp, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
@@ -43,6 +44,15 @@ builder.Services.AddHttpClient<OllamaClient>(client =>
     client.BaseAddress = new Uri(builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
     client.Timeout = Timeout.InfiniteTimeSpan;
 });
+
+// Reportes: Admin consulta a Order, Inventory y Auth a través del Gateway, reenviando el token del usuario
+builder.Services.AddTransient<TokenDelegatingHandler>();
+builder.Services.AddHttpClient(MicroserviciosApiClient.NombreHttpClient, client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:GatewayUrl"] ?? "https://localhost:7134");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddHttpMessageHandler<TokenDelegatingHandler>();
 
 // JWT Auth
 builder.Services.AddAuthentication(options =>
