@@ -12,11 +12,11 @@ namespace Infrastructure.Services
 {
     public class ProductoService : IProductoService
     {
-        private readonly ProductoRepository _productoRepository;
+        private readonly IProductoRepository _productoRepository;
         private readonly IValidator<Producto> _validator;
         private readonly ILogger<ProductoService> _logger;
 
-        public ProductoService(ProductoRepository productoRepository, IValidator<Producto> validator, ILogger<ProductoService> logger)
+        public ProductoService(IProductoRepository productoRepository, IValidator<Producto> validator, ILogger<ProductoService> logger)
         {
             _logger = logger;
             _productoRepository = productoRepository;

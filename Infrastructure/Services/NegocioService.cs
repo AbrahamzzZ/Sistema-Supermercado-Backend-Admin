@@ -2,6 +2,7 @@
 using Domain.Model.Dto.Negocio;
 using FluentValidation;
 using Infrastructure.Repository;
+using Infrastructure.Repository.InterfacesRepository;
 using Infrastructure.Repository.InterfacesServices;
 using Microsoft.Extensions.Logging;
 using Utilities.IA;
@@ -11,14 +12,14 @@ namespace Infrastructure.Services
 {
     public class NegocioService : INegocioService
     {
-        private readonly NegocioRepository _negocioRepository;
+        private readonly INegocioRepository _negocioRepository;
         private readonly IValidator<Negocio> _validator;
-        private readonly OllamaClient _ollama;
-        private readonly MicroserviciosApiClient _microservicios;
+        private readonly IOllamaClient _ollama;
+        private readonly IMicroserviciosApiClient _microservicios;
         private readonly ILogger<NegocioService> _logger;
 
-        public NegocioService(NegocioRepository negocioRepository, IValidator<Negocio> validator, OllamaClient ollama,
-            MicroserviciosApiClient microservicios, ILogger<NegocioService> logger)
+        public NegocioService(INegocioRepository negocioRepository, IValidator<Negocio> validator, IOllamaClient ollama,
+            IMicroserviciosApiClient microservicios, ILogger<NegocioService> logger)
         {
             _logger = logger;
             _negocioRepository = negocioRepository;

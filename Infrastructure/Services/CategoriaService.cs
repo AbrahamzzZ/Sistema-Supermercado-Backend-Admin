@@ -11,11 +11,11 @@ namespace Infrastructure.Services
 {
     public class CategoriaService : ICategoriaService
     {
-        private readonly CategoriaRepository _categoriaRepository;
+        private readonly ICategoriaRepository _categoriaRepository;
         private readonly IValidator<Categoria> _validator;
         private readonly ILogger<CategoriaService> _logger;
 
-        public CategoriaService(CategoriaRepository categoriaRepository, IValidator<Categoria> validator, ILogger<CategoriaService> logger)
+        public CategoriaService(ICategoriaRepository categoriaRepository, IValidator<Categoria> validator, ILogger<CategoriaService> logger)
         {
             _logger = logger;
             _categoriaRepository = categoriaRepository;

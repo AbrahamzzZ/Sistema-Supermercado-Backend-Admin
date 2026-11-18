@@ -11,11 +11,11 @@ namespace Infrastructure.Services
 {
     public class ProveedorService : IProveedorService
     {
-        private readonly ProveedorRepository _proveedorRepository;
+        private readonly IProveedorRepository _proveedorRepository;
         private readonly IValidator<Proveedor> _validator;
         private readonly ILogger<ProveedorService> _logger;
 
-        public ProveedorService(ProveedorRepository proveedorRepository, IValidator<Proveedor> validator, ILogger<ProveedorService> logger)
+        public ProveedorService(IProveedorRepository proveedorRepository, IValidator<Proveedor> validator, ILogger<ProveedorService> logger)
         {
             _logger = logger;
             _proveedorRepository = proveedorRepository;

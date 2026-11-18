@@ -11,11 +11,11 @@ namespace Infrastructure.Services
 {
     public class ClienteService : IClienteService
     {
-        private readonly ClienteRepository _clienteRepository;
+        private readonly IClienteRepository _clienteRepository;
         private readonly IValidator<Cliente> _validator;
         private readonly ILogger<ClienteService> _logger;
 
-        public ClienteService(ClienteRepository clienteRepository, IValidator<Cliente> validator, ILogger<ClienteService> logger)
+        public ClienteService(IClienteRepository clienteRepository, IValidator<Cliente> validator, ILogger<ClienteService> logger)
         {
             _logger = logger;
             _clienteRepository = clienteRepository;
