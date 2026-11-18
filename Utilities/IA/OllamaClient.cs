@@ -2,7 +2,12 @@
 
 namespace Utilities.IA
 {
-    public class OllamaClient
+    public interface IOllamaClient
+    {
+        Task<string> GenerateAsync(string prompt, string model = "qwen3:8b");
+    }
+
+    public class OllamaClient : IOllamaClient
     {
         private readonly HttpClient _http;
 
