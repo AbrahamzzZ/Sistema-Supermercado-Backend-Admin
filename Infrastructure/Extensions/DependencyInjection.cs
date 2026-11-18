@@ -15,14 +15,14 @@ namespace Infrastructure.Extensions
     {
         public static IServiceCollection AddRepositories(this IServiceCollection services)
         {
-            services.AddScoped<CategoriaRepository>();
-            services.AddScoped<ClienteRepository>();
-            services.AddScoped<ProveedorRepository>();
-            services.AddScoped<TransportistaRepository>();
-            services.AddScoped<NegocioRepository>();
-            services.AddScoped<ProductoRepository>();
-            services.AddScoped<OfertaRepository>();
-            services.AddScoped<SucursalRepository>();
+            services.AddScoped<ICategoriaRepository, CategoriaRepository>();
+            services.AddScoped<IClienteRepository, ClienteRepository>();
+            services.AddScoped<IProveedorRepository, ProveedorRepository>();
+            services.AddScoped<ITransportistaRepository, TransportistaRepository>();
+            services.AddScoped<INegocioRepository, NegocioRepository>();
+            services.AddScoped<IProductoRepository, ProductoRepository>();
+            services.AddScoped<IOfertaRepository, OfertaRepository>();
+            services.AddScoped<ISucursalRepository, SucursalRepository>();
             return services;
         }
 
@@ -30,16 +30,16 @@ namespace Infrastructure.Extensions
         {
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
-            services.AddScoped<CategoriaService>();
-            services.AddScoped<ClienteService>();
-            services.AddScoped<ProveedorService>();
-            services.AddScoped<TransportistaService>();
-            services.AddScoped<NegocioService>();
-            services.AddScoped<MicroserviciosApiClient>();
+            services.AddScoped<ICategoriaService, CategoriaService>();
+            services.AddScoped<IClienteService, ClienteService>();
+            services.AddScoped<IProveedorService, ProveedorService>();
+            services.AddScoped<ITransportistaService, TransportistaService>();
+            services.AddScoped<INegocioService, NegocioService>();
+            services.AddScoped<IMicroserviciosApiClient, MicroserviciosApiClient>();
             services.AddScoped<SeqLogService>();
-            services.AddScoped<ProductoService>();
-            services.AddScoped<OfertaService>();
-            services.AddScoped<SucursalService>();
+            services.AddScoped<IProductoService, ProductoService>();
+            services.AddScoped<IOfertaService, OfertaService>();
+            services.AddScoped<ISucursalService, SucursalService>();
             return services;
         }
 
