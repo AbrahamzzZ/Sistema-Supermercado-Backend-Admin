@@ -30,8 +30,6 @@ namespace Admin.Tests.Services
                 _microservicios.Object, NullLogger<NegocioService>.Instance);
         }
 
-        // ---------- Reportes (totales de Order + nombres de Admin) ----------
-
         [TestMethod]
         public async Task TopClientes_CombinaTotalesDeOrderConNombresDeAdmin()
         {
@@ -45,7 +43,6 @@ namespace Admin.Tests.Services
             Assert.IsTrue(resultado.IsSuccess);
             Assert.AreEqual("Ana Pérez", resultado.Data![0].Nombre_Completo);
             Assert.AreEqual(10, resultado.Data[0].Compras_Totales);
-            // El cliente 9 ya no existe en Admin: se muestra con un nombre genérico en vez de perder el dato.
             Assert.AreEqual("Cliente #9", resultado.Data[1].Nombre_Completo);
         }
 
@@ -71,8 +68,6 @@ namespace Admin.Tests.Services
             Assert.IsFalse(resultado.IsSuccess);
             Assert.AreEqual(Mensajes.MESSAGE_QUERY_EMPTY, resultado.Message);
         }
-
-        // ---------- Asistente de IA ----------
 
         [TestMethod]
         public async Task AnalisisIA_PreguntaAjenaAlNegocio_NoLlamaALaIA()
