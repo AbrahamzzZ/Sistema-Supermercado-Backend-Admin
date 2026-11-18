@@ -8,7 +8,7 @@ namespace Infrastructure.Services
     /// <summary>
     /// Consultas a otros microservicios a través del Gateway, para los reportes del negocio:
     /// </summary>
-    public class MicroserviciosApiClient
+    public class MicroserviciosApiClient : IMicroserviciosApiClient
     {
         public const string NombreHttpClient = "Gateway";
 

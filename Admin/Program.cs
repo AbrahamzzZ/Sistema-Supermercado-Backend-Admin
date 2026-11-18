@@ -39,7 +39,7 @@ builder.Services.AddDbContext<AdminSistemaSupermercadoContext>(options =>
 builder.Services.AddRepositories();
 builder.Services.AddServices();
 builder.Services.AddValidators();
-builder.Services.AddHttpClient<OllamaClient>(client =>
+builder.Services.AddHttpClient<IOllamaClient, OllamaClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
     client.Timeout = Timeout.InfiniteTimeSpan;

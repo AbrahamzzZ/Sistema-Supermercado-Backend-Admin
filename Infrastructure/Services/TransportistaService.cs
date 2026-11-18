@@ -11,11 +11,11 @@ namespace Infrastructure.Services
 {
     public class TransportistaService : ITransportistaService
     {
-        private readonly TransportistaRepository _transportistaRepository;
+        private readonly ITransportistaRepository _transportistaRepository;
         private readonly IValidator<Transportista> _validator;
         private readonly ILogger<TransportistaService> _logger;
 
-        public TransportistaService(TransportistaRepository transportistaRepository, IValidator<Transportista> validator, ILogger<TransportistaService> logger)
+        public TransportistaService(ITransportistaRepository transportistaRepository, IValidator<Transportista> validator, ILogger<TransportistaService> logger)
         {
             _logger = logger;
             _transportistaRepository = transportistaRepository;

@@ -12,11 +12,11 @@ namespace Infrastructure.Services
 {
     public class OfertaService : IOfertaService
     {
-        private readonly OfertaRepository _ofertaRepository;
+        private readonly IOfertaRepository _ofertaRepository;
         private readonly IValidator<Oferta> _validator;
         private readonly ILogger<OfertaService> _logger;
 
-        public OfertaService(OfertaRepository ofertaRepository, IValidator<Oferta> validator, ILogger<OfertaService> logger)
+        public OfertaService(IOfertaRepository ofertaRepository, IValidator<Oferta> validator, ILogger<OfertaService> logger)
         {
             _logger = logger;
             _ofertaRepository = ofertaRepository;

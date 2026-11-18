@@ -11,11 +11,11 @@ namespace Infrastructure.Services
 {
     public class SucursalService : ISucursalService
     {
-        private readonly SucursalRepository _sucursalRepository;
+        private readonly ISucursalRepository _sucursalRepository;
         private readonly IValidator<SucursalUbicacion> _validator;
         private readonly ILogger<SucursalService> _logger;
 
-        public SucursalService(SucursalRepository sucursalRepository, IValidator<SucursalUbicacion> validator, ILogger<SucursalService> logger)
+        public SucursalService(ISucursalRepository sucursalRepository, IValidator<SucursalUbicacion> validator, ILogger<SucursalService> logger)
         {
             _logger = logger;
             _sucursalRepository = sucursalRepository;
