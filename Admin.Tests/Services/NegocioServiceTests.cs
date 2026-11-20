@@ -120,5 +120,33 @@ namespace Admin.Tests.Services
             Assert.IsFalse(resultado.IsSuccess);
             Assert.AreEqual(Mensajes.MESSAGE_IA_NO_DISPONIBLE, resultado.Message);
         }
+
+        [TestMethod]
+        public async Task ResumirGraficoIA_Compras_UsaElReporteDeComprasYNoElStock()
+        {
+            _microservicios.Setup(m => m.ObtenerEstadisticaAsync("productos-comprados"))
+                .ReturnsAsync(new List<EstadisticaTotal> { new() { Id = 1, Total = 2 } });
+            _repositorio.Setup(r => r.ObtenerNombresProductosAsync(It.IsAny<IEnumerable<int>>()))
+                .ReturnsAsync(new Dictionary<int, string> { [1] = "Saco de papa" });
+
+            var resultado = await _servicio.ResumirGraficoIA("comprados");
+
+            Assert.IsTrue(resultado.IsSuccess);
+            _assistant.Verify(a => a.GenerateAsync(
+                It.Is<string>(p => p.Contains("Saco de papa: 2 unidades compradas") &&
+                    p.Contains("no infieras tendencias temporales")),
+                It.IsAny<CancellationToken>()), Times.Once);
+            _microservicios.Verify(m => m.ObtenerStocksAsync(), Times.Never);
+        }
+
+        [TestMethod]
+        public async Task ResumirGraficoIA_ClaveNoPermitida_NoLlamaALaIA()
+        {
+            var resultado = await _servicio.ResumirGraficoIA("sql-libre");
+
+            Assert.IsFalse(resultado.IsSuccess);
+            Assert.AreEqual(Mensajes.MESSAGE_IA_FAILLED, resultado.Message);
+            _assistant.Verify(a => a.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
     }
 }

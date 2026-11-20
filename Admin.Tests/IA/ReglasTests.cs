@@ -7,6 +7,8 @@ namespace Admin.Tests.IA
     {
         [DataTestMethod]
         [DataRow("¿Qué productos tienen poco stock?", TipoAnalisis.Producto)]
+        [DataRow("¿Qué productos se compraron más?", TipoAnalisis.Comprado)]
+        [DataRow("¿Qué productos se vendieron más?", TipoAnalisis.Vendido)]
         [DataRow("¿Cuántas categorías tengo?", TipoAnalisis.Categoria)]
         [DataRow("¿Quiénes son mis clientes frecuentes?", TipoAnalisis.Cliente)]
         [DataRow("¿Cuál es mi mejor proveedor?", TipoAnalisis.Proveedor)]
@@ -29,9 +31,9 @@ namespace Admin.Tests.IA
         }
 
         [TestMethod]
-        public void DetectarTipoAnalisis_ProductoTienePrioridadSobreVentas()
+        public void DetectarTipoAnalisis_ProductoCompradoPriorizaLaIntencionDeCompra()
         {
-            Assert.AreEqual(TipoAnalisis.Producto, Reglas.DetectarTipoAnalisis("productos más vendidos"));
+            Assert.AreEqual(TipoAnalisis.Comprado, Reglas.DetectarTipoAnalisis("productos más comprados"));
         }
     }
 }

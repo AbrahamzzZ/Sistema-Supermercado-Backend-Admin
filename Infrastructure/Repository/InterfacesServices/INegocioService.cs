@@ -15,5 +15,6 @@ namespace Infrastructure.Repository.InterfacesServices
         Task<ApiResponse<List<ViajesTransportista>>> ObtenerViajesTransportista();
         Task<ApiResponse<List<EmpleadoProductivo>>> ObtenerEmpleadosProductivos();
         Task<ApiResponse<string>> AnalisisIA(string? prompt, CancellationToken cancellationToken = default);
+        Task<ApiResponse<string>> ResumirGraficoIA(string? claveEstadistica, CancellationToken cancellationToken = default);
     }
 }

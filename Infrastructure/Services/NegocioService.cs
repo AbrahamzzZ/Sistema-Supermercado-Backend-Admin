@@ -124,24 +124,113 @@ namespace Infrastructure.Services
 
             var promptFinal = $"Datos del negocio:\n{datos}\n\nPregunta del usuario:\n{prompt}";
 
+            return await GenerarRespuestaIAAsync(promptFinal, tipo.ToString(), cancellationToken);
+        }
+
+        public async Task<ApiResponse<string>> ResumirGraficoIA(
+            string? claveEstadistica,
+            CancellationToken cancellationToken = default)
+        {
+            var clave = claveEstadistica?.Trim().ToLowerInvariant();
+            string titulo;
+            string datos;
+
+            switch (clave)
+            {
+                case "comprados":
+                {
+                    var reporte = await ObtenerProductoMasComprado();
+                    if (!reporte.IsSuccess) return FalloReporteIA(reporte.Message);
+                    titulo = "Productos más comprados";
+                    datos = string.Join("\n", (reporte.Data ?? []).Select(x => $"{x.Nombre_Producto}: {x.Cantidad_Comprada} unidades compradas"));
+                    break;
+                }
+                case "vendidos":
+                {
+                    var reporte = await ObtenerProductoMasVendido();
+                    if (!reporte.IsSuccess) return FalloReporteIA(reporte.Message);
+                    titulo = "Productos más vendidos";
+                    datos = string.Join("\n", (reporte.Data ?? []).Select(x => $"{x.Nombre_Producto}: {x.Cantidad_Vendida} unidades vendidas"));
+                    break;
+                }
+                case "clientes":
+                {
+                    var reporte = await ObtenerTopClientes();
+                    if (!reporte.IsSuccess) return FalloReporteIA(reporte.Message);
+                    titulo = "Clientes frecuentes";
+                    datos = string.Join("\n", (reporte.Data ?? []).Select(x => $"{x.Nombre_Completo}: {x.Compras_Totales} compras"));
+                    break;
+                }
+                case "proveedores":
+                {
+                    var reporte = await ObtenerTopProveedores();
+                    if (!reporte.IsSuccess) return FalloReporteIA(reporte.Message);
+                    titulo = "Proveedores preferidos";
+                    datos = string.Join("\n", (reporte.Data ?? []).Select(x => $"{x.Nombre_Completo}: {x.Compras_Totales} compras"));
+                    break;
+                }
+                case "empleados":
+                {
+                    var reporte = await ObtenerEmpleadosProductivos();
+                    if (!reporte.IsSuccess) return FalloReporteIA(reporte.Message);
+                    titulo = "Empleados más productivos";
+                    datos = string.Join("\n", (reporte.Data ?? []).Select(x => $"{x.Nombre_Completo}: {x.Ventas_Empleado} ventas"));
+                    break;
+                }
+                case "transportistas":
+                {
+                    var reporte = await ObtenerViajesTransportista();
+                    if (!reporte.IsSuccess) return FalloReporteIA(reporte.Message);
+                    titulo = "Viajes de transportistas";
+                    datos = string.Join("\n", (reporte.Data ?? []).Select(x => $"{x.Nombre_Completo}: {x.Viajes_Realizados} viajes"));
+                    break;
+                }
+                default:
+                    return ReglaIncumplida<string>(Mensajes.MESSAGE_IA_FAILLED, "ResumirGraficoIA");
+            }
+
+            if (string.IsNullOrWhiteSpace(datos))
+                return ReglaIncumplida<string>(Mensajes.MESSAGE_IA_SIN_DATOS, "ResumirGraficoIA");
+
+            var promptFinal =
+                $"Resume el reporte \"{titulo}\" usando exclusivamente estos datos:\n{datos}\n\n" +
+                "Son totales agregados; no se proporcionan transacciones individuales ni un período de tiempo. " +
+                "Describe lo que muestran los datos, pero no infieras tendencias temporales, causas ni comportamientos habituales.";
+
+            return await GenerarRespuestaIAAsync(promptFinal, $"grafico-{clave}", cancellationToken);
+        }
+
+        private async Task<ApiResponse<string>> GenerarRespuestaIAAsync(
+            string prompt,
+            string tipoAnalisis,
+            CancellationToken cancellationToken)
+        {
             string respuesta;
             try
             {
-                respuesta = await _assistant.GenerateAsync(promptFinal, cancellationToken);
+                respuesta = await _assistant.GenerateAsync(prompt, cancellationToken);
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError(ex, "Tiempo de espera agotado al generar el análisis con IA de tipo {TipoAnalisis}", tipo);
+                _logger.LogError(ex, "Tiempo de espera agotado al generar el análisis con IA de tipo {TipoAnalisis}", tipoAnalisis);
                 return new ApiResponse<string> { IsSuccess = false, Message = Mensajes.MESSAGE_IA_NO_DISPONIBLE };
             }
             catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or InvalidOperationException)
             {
-                _logger.LogError(ex, "Error al generar el análisis con IA de tipo {TipoAnalisis}", tipo);
+                _logger.LogError(ex, "Error al generar el análisis con IA de tipo {TipoAnalisis}", tipoAnalisis);
                 return new ApiResponse<string> { IsSuccess = false, Message = Mensajes.MESSAGE_IA_NO_DISPONIBLE };
             }
 
-            _logger.LogInformation("Análisis con IA de tipo {TipoAnalisis} generado", tipo);
+            _logger.LogInformation("Análisis con IA de tipo {TipoAnalisis} generado", tipoAnalisis);
             return new ApiResponse<string> { IsSuccess = true, Message = Mensajes.MESSAGE_IA, Data = respuesta };
+        }
+
+        private static ApiResponse<string> FalloReporteIA(string? mensaje)
+        {
+            var mensajeIa = mensaje == Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE
+                ? Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE
+                : Mensajes.MESSAGE_IA_SIN_DATOS;
+            return new ApiResponse<string> { IsSuccess = false, Message = mensajeIa };
         }
 
         private async Task<string?> ObtenerDatosAnalisisAsync(TipoAnalisis tipo)

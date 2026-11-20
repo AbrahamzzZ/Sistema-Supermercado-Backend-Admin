@@ -36,8 +36,6 @@ namespace APIRestSistemaVentas.Controllers
             return response.IsSuccess ? Ok(response) : BadRequest(response);
         }
 
-        // Reportes: mismas rutas que el monolito (las usa el frontend). Los totales vienen de Order y los nombres de DB_Admin.
-
         // GET: api/negocio/productos-mas-comprados
         [HttpGet("productos-mas-comprados")]
         public async Task<ActionResult<ApiResponse<List<ProductoMasComprado>>>> ObtenerProductosMasComprados()
@@ -61,6 +59,16 @@ namespace APIRestSistemaVentas.Controllers
             CancellationToken cancellationToken)
         {
             var response = await _negocioService.AnalisisIA(request.Prompt, cancellationToken);
+            return response.IsSuccess ? Ok(response) : BadRequest(response);
+        }
+
+        // POST: api/negocio/resumen-grafico-ia
+        [HttpPost("resumen-grafico-ia")]
+        public async Task<ActionResult<ApiResponse<string>>> ResumirGraficoIA(
+            [FromBody] ResumenGraficoIARequest request,
+            CancellationToken cancellationToken)
+        {
+            var response = await _negocioService.ResumirGraficoIA(request.ClaveEstadistica, cancellationToken);
             return response.IsSuccess ? Ok(response) : BadRequest(response);
         }
 
