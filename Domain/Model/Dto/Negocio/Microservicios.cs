@@ -30,4 +30,9 @@ namespace Domain.Model.Dto.Negocio
     {
         public string Prompt { get; set; } = "";
     }
+
+    public class ResumenGraficoIARequest
+    {
+        public string ClaveEstadistica { get; set; } = "";
+    }
 }
