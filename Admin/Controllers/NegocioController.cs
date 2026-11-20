@@ -56,9 +56,11 @@ namespace APIRestSistemaVentas.Controllers
 
         // POST: api/negocio/analisis-ia
         [HttpPost("analisis-ia")]
-        public async Task<ActionResult<ApiResponse<string>>> GenerarAnalisisIA([FromBody] AnalisisIARequest request)
+        public async Task<ActionResult<ApiResponse<string>>> GenerarAnalisisIA(
+            [FromBody] AnalisisIARequest request,
+            CancellationToken cancellationToken)
         {
-            var response = await _negocioService.AnalisisIA(request.Prompt);
+            var response = await _negocioService.AnalisisIA(request.Prompt, cancellationToken);
             return response.IsSuccess ? Ok(response) : BadRequest(response);
         }
 
