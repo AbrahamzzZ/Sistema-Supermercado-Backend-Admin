@@ -14,17 +14,17 @@ namespace Infrastructure.Services
     {
         private readonly INegocioRepository _negocioRepository;
         private readonly IValidator<Negocio> _validator;
-        private readonly IOllamaClient _ollama;
+        private readonly IAssistantClient _assistant;
         private readonly IMicroserviciosApiClient _microservicios;
         private readonly ILogger<NegocioService> _logger;
 
-        public NegocioService(INegocioRepository negocioRepository, IValidator<Negocio> validator, IOllamaClient ollama,
+        public NegocioService(INegocioRepository negocioRepository, IValidator<Negocio> validator, IAssistantClient assistant,
             IMicroserviciosApiClient microservicios, ILogger<NegocioService> logger)
         {
             _logger = logger;
             _negocioRepository = negocioRepository;
             _validator = validator;
-            _ollama = ollama;
+            _assistant = assistant;
             _microservicios = microservicios;
         }
 
@@ -109,7 +109,7 @@ namespace Infrastructure.Services
             return nombres;
         }
 
-        public async Task<ApiResponse<string>> AnalisisIA(string? prompt)
+        public async Task<ApiResponse<string>> AnalisisIA(string? prompt, CancellationToken cancellationToken = default)
         {
             var tipo = Reglas.DetectarTipoAnalisis(prompt);
             if (tipo == TipoAnalisis.Invalido)
@@ -122,16 +122,21 @@ namespace Infrastructure.Services
             if (string.IsNullOrWhiteSpace(datos))
                 return ReglaIncumplida<string>(Mensajes.MESSAGE_IA_SIN_DATOS, "AnalisisIA");
 
-            var promptFinal = $"Analiza estos datos y responde en máximo 3 líneas: {datos} Pregunta: {prompt}";
+            var promptFinal = $"Datos del negocio:\n{datos}\n\nPregunta del usuario:\n{prompt}";
 
             string respuesta;
             try
             {
-                respuesta = await _ollama.GenerateAsync(promptFinal);
+                respuesta = await _assistant.GenerateAsync(promptFinal, cancellationToken);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError(ex, "Error al generar el análisis con IA (Ollama) de tipo {TipoAnalisis}", tipo);
+                _logger.LogError(ex, "Tiempo de espera agotado al generar el análisis con IA de tipo {TipoAnalisis}", tipo);
+                return new ApiResponse<string> { IsSuccess = false, Message = Mensajes.MESSAGE_IA_NO_DISPONIBLE };
+            }
+            catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or InvalidOperationException)
+            {
+                _logger.LogError(ex, "Error al generar el análisis con IA de tipo {TipoAnalisis}", tipo);
                 return new ApiResponse<string> { IsSuccess = false, Message = Mensajes.MESSAGE_IA_NO_DISPONIBLE };
             }
 

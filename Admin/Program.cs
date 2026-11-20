@@ -39,10 +39,10 @@ builder.Services.AddDbContext<AdminSistemaSupermercadoContext>(options =>
 builder.Services.AddRepositories();
 builder.Services.AddServices();
 builder.Services.AddValidators();
-builder.Services.AddHttpClient<IOllamaClient, OllamaClient>(client =>
+builder.Services.AddHttpClient<IAssistantClient, OpenAIAssistantClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
-    client.Timeout = Timeout.InfiniteTimeSpan;
+    client.BaseAddress = new Uri("https://api.openai.com/v1/");
+    client.Timeout = TimeSpan.FromSeconds(builder.Configuration.GetValue<int?>("OpenAI:TimeoutSeconds") ?? 60);
 });
 
 // Reportes: Admin consulta a Order, Inventory y Auth a través del Gateway, reenviando el token del usuario

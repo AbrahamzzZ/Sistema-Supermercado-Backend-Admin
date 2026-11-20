@@ -23,7 +23,7 @@ namespace APIRestSistemaVentas.Controllers
 
         // GET: api/producto
         [HttpGet]
-        public async Task<ActionResult<ApiResponse<ProductoCategoria>>> GetProductos()
+        public async Task<ActionResult<ApiResponse<List<ProductoCategoria>>>> GetProductos()
         {
             var productos = await _productoService.ListarProductosAsync();
             return Ok(productos);

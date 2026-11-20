@@ -21,7 +21,14 @@ dotnet run --project Admin --launch-profile https     # https://localhost:7047/s
 ```
 
 Necesita SQL Server y **Auth** corriendo (para validar tokens). Los reportes necesitan además el **Gateway** y
-**Order**; el asistente de IA, **Ollama** con el modelo `qwen3:8b` (`ollama pull qwen3:8b`); y la pantalla de logs, **Seq**.
+**Order**; el asistente de IA usa la API de OpenAI. Para configurar la clave en desarrollo local:
+
+```bash
+dotnet user-secrets set "OpenAI:ApiKey" "<tu-api-key>" --project Admin/Admin.csproj
+```
+
+El modelo predeterminado es `gpt-6-luna` y puede cambiarse con `OpenAI:Model`. Para Docker, configura
+`OPENAI_API_KEY` en el entorno o en un archivo `.env` local junto al `docker-compose.yml` (no lo subas a Git).
 
 ## Endpoints principales
 

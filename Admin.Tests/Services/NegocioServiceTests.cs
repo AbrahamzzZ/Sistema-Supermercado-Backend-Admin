@@ -15,7 +15,7 @@ namespace Admin.Tests.Services
     {
         private Mock<INegocioRepository> _repositorio = null!;
         private Mock<IMicroserviciosApiClient> _microservicios = null!;
-        private Mock<IOllamaClient> _ollama = null!;
+        private Mock<IAssistantClient> _assistant = null!;
         private NegocioService _servicio = null!;
 
         [TestInitialize]
@@ -23,10 +23,10 @@ namespace Admin.Tests.Services
         {
             _repositorio = new Mock<INegocioRepository>();
             _microservicios = new Mock<IMicroserviciosApiClient>();
-            _ollama = new Mock<IOllamaClient>();
-            _ollama.Setup(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync("respuesta de la IA");
+            _assistant = new Mock<IAssistantClient>();
+            _assistant.Setup(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("respuesta de la IA");
 
-            _servicio = new NegocioService(_repositorio.Object, Mock.Of<IValidator<Negocio>>(), _ollama.Object,
+            _servicio = new NegocioService(_repositorio.Object, Mock.Of<IValidator<Negocio>>(), _assistant.Object,
                 _microservicios.Object, NullLogger<NegocioService>.Instance);
         }
 
@@ -76,7 +76,7 @@ namespace Admin.Tests.Services
 
             Assert.IsFalse(resultado.IsSuccess);
             Assert.AreEqual(Mensajes.MESSAGE_IA_FAILLED, resultado.Message);
-            _ollama.Verify(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            _assistant.Verify(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [TestMethod]
@@ -91,9 +91,9 @@ namespace Admin.Tests.Services
 
             Assert.IsTrue(resultado.IsSuccess);
             Assert.AreEqual("respuesta de la IA", resultado.Data);
-            _ollama.Verify(o => o.GenerateAsync(
+            _assistant.Verify(o => o.GenerateAsync(
                 It.Is<string>(p => p.Contains("Arroz: 12 unidades en stock") && p.Contains("Azúcar: 0 unidades en stock")),
-                It.IsAny<string>()), Times.Once);
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [TestMethod]
@@ -106,14 +106,14 @@ namespace Admin.Tests.Services
 
             Assert.IsFalse(resultado.IsSuccess);
             Assert.AreEqual(Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE, resultado.Message);
-            _ollama.Verify(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            _assistant.Verify(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [TestMethod]
-        public async Task AnalisisIA_OllamaCaido_DevuelveMensajeControlado()
+        public async Task AnalisisIA_ProveedorNoDisponible_DevuelveMensajeControlado()
         {
             _repositorio.Setup(r => r.ObtenerNombresCategoriasAsync()).ReturnsAsync(new List<string> { "Bebidas" });
-            _ollama.Setup(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<string>())).ThrowsAsync(new HttpRequestException("Ollama apagado"));
+            _assistant.Setup(o => o.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new HttpRequestException("Proveedor apagado"));
 
             var resultado = await _servicio.AnalisisIA("¿Cuántas categorías tengo?");
 
