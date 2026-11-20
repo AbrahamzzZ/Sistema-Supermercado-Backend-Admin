@@ -13,24 +13,33 @@ namespace Infrastructure.Services
     public class ProductoService : IProductoService
     {
         private readonly IProductoRepository _productoRepository;
+        private readonly IMicroserviciosApiClient _microservicios;
         private readonly IValidator<Producto> _validator;
         private readonly ILogger<ProductoService> _logger;
 
-        public ProductoService(IProductoRepository productoRepository, IValidator<Producto> validator, ILogger<ProductoService> logger)
+        public ProductoService(
+            IProductoRepository productoRepository,
+            IMicroserviciosApiClient microservicios,
+            IValidator<Producto> validator,
+            ILogger<ProductoService> logger)
         {
             _logger = logger;
             _productoRepository = productoRepository;
+            _microservicios = microservicios;
             _validator = validator;
         }
 
         public async Task<ApiResponse<List<ProductoCategoria>>> ListarProductosAsync()
         {
-            var listapProductos = await _productoRepository.ListarProductosAsync();
+            var listaProductos = await _productoRepository.ListarProductosAsync();
 
-            if (listapProductos == null || listapProductos.Count == 0)
-                return new ApiResponse<List<ProductoCategoria>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY, Data = listapProductos };
+            if (listaProductos == null || listaProductos.Count == 0)
+                return new ApiResponse<List<ProductoCategoria>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY, Data = listaProductos };
 
-            return new ApiResponse<List<ProductoCategoria>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = listapProductos };
+            if (!await AgregarDatosInventarioAsync(listaProductos))
+                return new ApiResponse<List<ProductoCategoria>> { IsSuccess = false, Message = Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE };
+
+            return new ApiResponse<List<ProductoCategoria>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = listaProductos };
         }
 
         public async Task<ApiResponse<Paginacion<ProductoCategoria>>> ListarProductosPaginacionAsync(int pageNumber, int pageSize)
@@ -42,7 +51,33 @@ namespace Infrastructure.Services
                 return new ApiResponse<Paginacion<ProductoCategoria>> { IsSuccess = false, Message = Mensajes.MESSAGE_QUERY_EMPTY, Data = pagedResult };
             }
 
+            if (!await AgregarDatosInventarioAsync(pagedResult.Items))
+                return new ApiResponse<Paginacion<ProductoCategoria>> { IsSuccess = false, Message = Mensajes.MESSAGE_SERVICIO_NO_DISPONIBLE };
+
             return new ApiResponse<Paginacion<ProductoCategoria>> { IsSuccess = true, Message = Mensajes.MESSAGE_QUERY, Data = pagedResult };
+        }
+
+        private async Task<bool> AgregarDatosInventarioAsync(IEnumerable<ProductoCategoria> productos)
+        {
+            var inventario = await _microservicios.ObtenerStocksAsync();
+            if (inventario == null)
+                return false;
+
+            var inventarioPorProducto = inventario.ToDictionary(item => item.IdProducto);
+            foreach (var producto in productos)
+            {
+                if (!inventarioPorProducto.TryGetValue(producto.Id_Producto, out var datos))
+                {
+                    producto.Stock = 0;
+                    continue;
+                }
+
+                producto.Stock = datos.Stock;
+                producto.PrecioCompra = datos.PrecioCompra;
+                producto.PrecioVenta = datos.PrecioVenta;
+            }
+
+            return true;
         }
 
         public async Task<ApiResponse<Producto>> ObtenerProductoAsync(int idProducto)
