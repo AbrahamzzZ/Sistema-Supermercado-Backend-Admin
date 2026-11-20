@@ -12,6 +12,9 @@ namespace Domain.Model.Dto
         public string? Nombre_Categoria { get; set; }
         public string? Pais_Origen { get; set; }
         public bool? Estado { get; set; }
+        public int Stock { get; set; }
+        public decimal? PrecioCompra { get; set; }
+        public decimal? PrecioVenta { get; set; }
         [NotMapped]
         public int TotalCount { get; set; }
     }
