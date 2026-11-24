@@ -2,7 +2,7 @@
 
 Microservicio de **datos maestros y reportes**: productos, categorías, clientes, proveedores, transportistas,
 sucursales, ofertas y datos del negocio. También arma los **reportes del negocio** (con datos de Order), atiende el
-**asistente de IA** (Ollama) y expone los **logs del sistema** que se ven en la app (leídos desde Seq).
+**asistente de IA** (OpenAI) y expone los **logs del sistema** que se ven en la app (leídos desde Seq).
 
 **Base de datos:** `DB_Admin` — `PRODUCTO`, `CATEGORIA`, `CLIENTE`, `PROVEEDOR`, `TRANSPORTISTA`, `SUCURSAL`, `OFERTA`, `NEGOCIO`.
 
@@ -37,5 +37,6 @@ El modelo predeterminado es `gpt-6-luna` y puede cambiarse con `OpenAI:Model`. P
 | `/api/{Recurso}` | CRUD de Producto, Categoria, Cliente, Proveedor, Transportista, Sucursal y Oferta (borrado lógico) |
 | `/api/Negocio/{id}` | Datos del negocio |
 | `GET /api/Negocio/productos-mas-vendidos`, `top-clientes`, … | Reportes (top 5) |
-| `POST /api/Negocio/analisis-ia` | Asistente de IA |
+| `POST /api/Negocio/analisis-ia` | Asistente de IA: responde preguntas sobre el negocio |
+| `POST /api/Negocio/resumen-grafico-ia` | Asistente de IA: resume la estadística que se ve en el panel |
 | `GET /api/Log/paginacion` | Errores y advertencias de todo el sistema (solo Administrador) |
