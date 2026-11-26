@@ -14,14 +14,27 @@ sucursales, ofertas y datos del negocio. También arma los **reportes del negoci
 
 Normalmente se levanta con el `docker-compose.yml` del repo del Gateway (Swagger: http://localhost:8001/swagger).
 
-Solo este servicio:
+**Para depurar (modo híbrido):** el resto del sistema sigue en Docker y este servicio corre desde Visual Studio.
 
 ```bash
-dotnet run --project Admin --launch-profile https     # https://localhost:7047/swagger
+# en el repo del Gateway
+docker compose up -d                  # todo el sistema
+docker compose stop admin-api       # libera el servicio que vas a depurar
 ```
 
-Necesita SQL Server y **Auth** corriendo (para validar tokens). Los reportes necesitan además el **Gateway** y
-**Order**; el asistente de IA usa la API de OpenAI. Para configurar la clave en desarrollo local:
+Luego F5 en Visual Studio (o `dotnet run --project Admin --launch-profile https`) → https://localhost:7047/swagger.
+En el entorno Development, `appsettings.Development.json` lo conecta a lo que corre en Docker: SQL Server
+`localhost,14330` (las mismas bases), Auth `http://localhost:8002` (validación de tokens), Gateway
+`http://localhost:8000`.
+
+Pruébalo desde su Swagger con un token de `POST http://localhost:8000/auth/Usuario/login` (botón *Authorize*):
+el frontend sigue pasando por el Gateway de Docker, que apunta al contenedor detenido. Al terminar:
+`docker compose up -d --build admin-api`.
+
+Para usar tu propio SQL Server en vez del de Docker, define `ConnectionStrings:CadenaSQL` con `dotnet user-secrets`
+(tiene prioridad sobre `appsettings.Development.json`).
+
+El asistente de IA usa la API de OpenAI. Para configurar la clave en desarrollo local:
 
 ```bash
 dotnet user-secrets set "OpenAI:ApiKey" "<tu-api-key>" --project Admin/Admin.csproj
